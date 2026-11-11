@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ML artifacts & datasets pesados
+mlruns/
+*.pkl
+*.joblib
+*.onnx
+data/raw/*.parquet
+data/raw/*.csv
+!data/samples/.gitkeep
+
+# Frontend (Node / Vue)
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# Infra & Env
+.env
+*.log
+data/postgres/
+data/neo4j/
+data/redis/
+
+# IDE / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Contexto privado de mentoria e estratégia de carreira (nunca subir ao GitHub)
+.agents/MENTOR_PRIVATE.md
+
