@@ -31,10 +31,10 @@ Este projeto consolida cinco pilares práticos em um único sistema distribuído
 - **Passo 0.1 (Concluído):** criação isolada em `C:\DEV\fleetpulse-ai`, `git init -b main`, `.gitignore`, `.agents/` (`README.md`, `SPEC.md`, `ARCHITECTURE.md`, `CONVENTIONS.md`, `CHANGELOG.md`, `ROADMAP.md`, `skills/`).
 - **Passo 0.2 (Concluído):** criação dos 3 primeiros ADRs em `docs/adr/`, `README.md` completo, `.env.example`, `docker-compose.yml` (`PostgreSQL + pgvector`, `Neo4j`, `Redis`), validação dos containers e primeiro commit local (pronto para `git push` no GitHub).
 
-### Sprint 1 — System Design & Máquina de Estados Assíncrona
-- API `FastAPI` com `POST /v1/alerts` (`202 Accepted`), `Idempotency-Key` no Redis, Rate Limiter, fila assíncrona no Redis, Worker com retry exponencial e **Dead Letter Queue (DLQ)**.
-- Persistência da máquina de estados no PostgreSQL (`alert_events`) e streaming de progresso em tempo real via **SSE (`GET /v1/alerts/{id}/stream`)**.
-- Testes unitários e de contrato (`pytest`).
+### Sprint 1 — System Design & Máquina de Estados Assíncrona (Concluída)
+- API `FastAPI` com `POST /v1/alerts` (`202 Accepted`), `Idempotency-Key` no Redis, Rate Limiter, fila assíncrona no Redis, Worker com deduplicação (`SET NX EX`), retry exponencial e **Dead Letter Queue (DLQ)**.
+- Persistência da máquina de estados no PostgreSQL (`alerts` + `alert_events`) e streaming de progresso em tempo real via **SSE (`GET /v1/alerts/{id}/stream`)**.
+- Testes unitários e de contrato (`pytest`: `14 passed`) e fluxo validado ponta a ponta contra PostgreSQL + Redis no Docker.
 
 ### Sprint 2 — Machine Learning na Prática (Risco de RMA & SLA + SHAP)
 - Gerador/dataset realista de telemetria de **notebooks e smartphones** (ciclos de bateria, temperatura, erros S.M.A.R.T./NVMe, kernel panics, versão de firmware, histórico e tier de SLA).
