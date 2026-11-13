@@ -107,7 +107,7 @@ Portas padrão expostas localmente:
 - [x] **Sprint 0 — Passo 0.1:** Estrutura `.agents/`, `SPEC.md`, `ARCHITECTURE.md`, `CONVENTIONS.md`, `ROADMAP.md` e skills operacionais
 - [x] **Sprint 0 — Passo 0.2:** ADRs (`ADR-001` a `ADR-003`), `README.md`, `.env.example`, `docker-compose.yml` e validação de infraestrutura
 - [x] **Sprint 1:** Ingestão FastAPI (`202 Accepted`), Idempotency-Key, Rate Limiter, Redis Queue + DLQ, Máquina de Estados e SSE (`14` testes em `pytest` + fluxo validado contra Docker)
-- [ ] **Sprint 2:** Dataset & Pipeline de ML sem *data leakage* + explicabilidade SHAP
+- [x] **Sprint 2:** Telemetria realista de frotas (notebooks e smartphones), pipeline de ML tabular sem data leakage (split temporal + agrupamento por dispositivo), avaliação rigorosa com PR-AUC e calibração de Brier score, explicabilidade local via SHAP TreeExplainer e integração assíncrona no worker avançando o estado para `ML_SCORED` (`18` testes automatizados passando)
 - [ ] **Sprint 3:** RAG Híbrido (Neo4j + `pgvector` + Cache Semântico + Text-to-Cypher)
 - [ ] **Sprint 4:** Hybrid AI Router, Auto-correção Pydantic/Neo4j, Guardrails e Human-in-the-Loop
 - [ ] **Sprint 5:** Dashboard Vue 3 + Simulador de carga "Tempestade de Firmware" + Benchmarks

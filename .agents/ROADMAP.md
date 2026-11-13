@@ -36,9 +36,12 @@ Este projeto consolida cinco pilares práticos em um único sistema distribuído
 - Persistência da máquina de estados no PostgreSQL (`alerts` + `alert_events`) e streaming de progresso em tempo real via **SSE (`GET /v1/alerts/{id}/stream`)**.
 - Testes unitários e de contrato (`pytest`: `14 passed`) e fluxo validado ponta a ponta contra PostgreSQL + Redis no Docker.
 
-### Sprint 2 — Machine Learning na Prática (Risco de RMA & SLA + SHAP)
-- Gerador/dataset realista de telemetria de **notebooks e smartphones** (ciclos de bateria, temperatura, erros S.M.A.R.T./NVMe, kernel panics, versão de firmware, histórico e tier de SLA).
-- Pipeline de treino sem *data leakage* (split temporal + agrupamento por `device_id`), comparação baseline vs modelo final (`LightGBM` / `scikit-learn`), métricas (`PR-AUC`, `F1`, calibração) e explicabilidade local com **SHAP** servida pelo worker.
+### Sprint 2 — Machine Learning na Prática (Risco de RMA & SLA + SHAP) (Concluída)
+- Gerador e dataset sintético realista de telemetria de **notebooks e smartphones** com desgaste físico (ciclos de bateria, temperatura, erros S.M.A.R.T./NVMe, thermal throttling).
+- Pipeline de treino rigoroso com split anti-leakage (temporal + agrupamento estrito por `device_id`), eliminando contaminação entre treino e teste.
+- Comparação contra baseline (`DummyClassifier`, `LogisticRegression`, `RandomForestClassifier`), avaliada com métricas reais (`PR-AUC = 0.6535` vs `0.3330` baseline, `Brier score = 0.1610`).
+- Explicabilidade local com **SHAP TreeExplainer** traduzida em justificativas humanas legíveis em português e integrada ao worker assíncrono (`DEDUPED -> ML_SCORED`).
+- Cobertura com `18` testes automatizados (`pytest`) e persistência no PostgreSQL + SSE.
 
 ### Sprint 3 — RAG Híbrido (Neo4j + pgvector + Cache Semântico)
 - Modelagem do grafo no **Neo4j** (`DeviceType → Model → Batch → Subsystem → FirmwareVersion → ErrorCode → TechBulletin → Runbook`).

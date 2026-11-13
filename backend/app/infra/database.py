@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Uuid, select, text
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Uuid, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -57,6 +57,10 @@ class AlertRecord(Base):
     current_status: Mapped[str] = mapped_column(
         String(32), default=AlertStatus.RECEIVED.value, index=True
     )
+    rma_risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sla_breach_risk: Mapped[float | None] = mapped_column(Float, nullable=True)
+    predicted_subsystem: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    shap_factors: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
@@ -99,9 +103,20 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
 
 
 async def init_db(engine: AsyncEngine) -> None:
-    """Create missing relational tables on application startup."""
+    """Create missing relational tables on application startup and ensure ML columns exist."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        if engine.dialect.name == "postgresql":
+            await conn.execute(
+                text(
+                    """
+                    ALTER TABLE alerts ADD COLUMN IF NOT EXISTS rma_risk_score DOUBLE PRECISION;
+                    ALTER TABLE alerts ADD COLUMN IF NOT EXISTS sla_breach_risk DOUBLE PRECISION;
+                    ALTER TABLE alerts ADD COLUMN IF NOT EXISTS predicted_subsystem VARCHAR(32);
+                    ALTER TABLE alerts ADD COLUMN IF NOT EXISTS shap_factors JSONB;
+                    """
+                )
+            )
 
 
 async def ping_db(engine: AsyncEngine) -> bool:
@@ -205,6 +220,16 @@ async def transition_alert_state(
     now = utc_now()
     alert.current_status = target_status.value
     alert.updated_at = now
+
+    if metadata:
+        if "rma_risk_score" in metadata and metadata["rma_risk_score"] is not None:
+            alert.rma_risk_score = float(metadata["rma_risk_score"])
+        if "sla_breach_risk" in metadata and metadata["sla_breach_risk"] is not None:
+            alert.sla_breach_risk = float(metadata["sla_breach_risk"])
+        if "predicted_subsystem" in metadata and metadata["predicted_subsystem"] is not None:
+            alert.predicted_subsystem = str(metadata["predicted_subsystem"])
+        if "shap_factors" in metadata and metadata["shap_factors"] is not None:
+            alert.shap_factors = metadata["shap_factors"]
 
     event = AlertEventRecord(
         id=uuid4(),

@@ -63,11 +63,7 @@ def _build_accepted_response(
 
 def _format_sse_frame(event: AlertStreamEvent) -> str:
     """Format an AlertStreamEvent as a Server-Sent Events wire frame."""
-    return (
-        f"id: {event.event_id}\n"
-        f"event: alert_status\n"
-        f"data: {event.model_dump_json()}\n\n"
-    )
+    return f"id: {event.event_id}\nevent: alert_status\ndata: {event.model_dump_json()}\n\n"
 
 
 @router.post(
@@ -160,6 +156,12 @@ async def get_alert_detail(
         error_code=alert.error_code,
         sla_tier=SLATier(alert.sla_tier),
         current_status=AlertStatus(alert.current_status),
+        rma_risk_score=alert.rma_risk_score,
+        sla_breach_risk=alert.sla_breach_risk,
+        predicted_subsystem=Subsystem(alert.predicted_subsystem)
+        if alert.predicted_subsystem
+        else None,
+        shap_factors=alert.shap_factors,
         created_at=alert.created_at,
         updated_at=alert.updated_at,
         events=[to_stream_event(event) for event in events],

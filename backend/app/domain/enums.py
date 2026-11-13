@@ -59,9 +59,7 @@ VALID_TRANSITIONS: dict[AlertStatus, frozenset[AlertStatus]] = {
     ),
     AlertStatus.DEDUPED: frozenset({AlertStatus.ML_SCORED, AlertStatus.FAILED_DLQ}),
     AlertStatus.ML_SCORED: frozenset({AlertStatus.CONTEXT_RETRIEVED, AlertStatus.FAILED_DLQ}),
-    AlertStatus.CONTEXT_RETRIEVED: frozenset(
-        {AlertStatus.AGENT_DIAGNOSED, AlertStatus.FAILED_DLQ}
-    ),
+    AlertStatus.CONTEXT_RETRIEVED: frozenset({AlertStatus.AGENT_DIAGNOSED, AlertStatus.FAILED_DLQ}),
     AlertStatus.AGENT_DIAGNOSED: frozenset({AlertStatus.SCHEMA_VALIDATED, AlertStatus.FAILED_DLQ}),
     AlertStatus.SCHEMA_VALIDATED: frozenset(
         {AlertStatus.HUMAN_REVIEW, AlertStatus.AUTO_RECOMMENDED, AlertStatus.FAILED_DLQ}

@@ -31,6 +31,7 @@ from app.infra.redis_client import (
     push_to_dlq,
     schedule_retry_job,
 )
+from app.ml.service import get_ml_service
 
 logger = logging.getLogger("fleetpulse.worker")
 
@@ -113,9 +114,47 @@ async def process_single_job(
                 reason="Passed deduplication window",
                 metadata={"attempt": job.attempt},
             )
+            current_status = AlertStatus.DEDUPED
+
+        # ML Scoring Step: Predict RMA risk, SLA breach probability, and local SHAP attributions
+        if current_status == AlertStatus.DEDUPED:
+            async with session_factory() as session:
+                alert = await session.get(AlertRecord, job.alert_id)
+                if alert is None:
+                    raise LookupError(f"Alert {job.alert_id} missing from PostgreSQL")
+                alert_dict = {
+                    "device_type": alert.device_type,
+                    "model_code": alert.model_code,
+                    "batch_id": alert.batch_id,
+                    "firmware_version": alert.firmware_version,
+                    "sla_tier": alert.sla_tier,
+                    "age_days": alert.age_days,
+                    "subsystem": alert.subsystem,
+                    "error_code": alert.error_code,
+                    "telemetry": alert.telemetry,
+                }
+
+            ml_service = get_ml_service()
+            score_res = ml_service.score_alert(alert_dict)
+
+            await _transition_and_publish(
+                session_factory=session_factory,
+                redis_client=redis_client,
+                job=job,
+                target_status=AlertStatus.ML_SCORED,
+                reason="Tabular ML scoring and SHAP attribution completed",
+                metadata={
+                    "rma_risk_score": score_res.rma_risk_score,
+                    "sla_breach_risk": score_res.sla_breach_risk,
+                    "predicted_subsystem": score_res.predicted_subsystem.value,
+                    "shap_factors": [f.model_dump() for f in score_res.shap_factors],
+                    "model_version": score_res.model_version,
+                },
+            )
+            current_status = AlertStatus.ML_SCORED
 
         await step(job)
-        return AlertStatus.DEDUPED
+        return current_status
 
     except Exception as exc:
         if job.attempt < settings.worker_max_retries:

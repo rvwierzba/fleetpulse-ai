@@ -88,6 +88,10 @@ class AlertDetailResponse(BaseModel):
     error_code: str
     sla_tier: SLATier
     current_status: AlertStatus
+    rma_risk_score: float | None = None
+    sla_breach_risk: float | None = None
+    predicted_subsystem: Subsystem | None = None
+    shap_factors: list[dict[str, Any]] | None = None
     created_at: datetime
     updated_at: datetime
     events: list[AlertStreamEvent]

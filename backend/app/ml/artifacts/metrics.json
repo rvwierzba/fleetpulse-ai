@@ -1,0 +1,44 @@
+{
+  "model_version": "v1.0.0",
+  "dataset": {
+    "total_alerts": 3500,
+    "train_size": 1946,
+    "test_size": 208,
+    "train_unique_devices": 337,
+    "test_unique_devices": 92,
+    "train_rma_prevalence": 0.3977,
+    "test_rma_prevalence": 0.351
+  },
+  "rma_risk_comparison": {
+    "baseline_dummy": {
+      "pr_auc": 0.333,
+      "roc_auc": 0.4533,
+      "f1": 0.3117,
+      "brier_score": 0.5096
+    },
+    "baseline_logreg": {
+      "pr_auc": 0.6051,
+      "roc_auc": 0.7605,
+      "f1": 0.5493,
+      "brier_score": 0.1885
+    },
+    "production_random_forest": {
+      "pr_auc": 0.6535,
+      "roc_auc": 0.8005,
+      "f1": 0.6557,
+      "brier_score": 0.1836
+    }
+  },
+  "sla_breach_comparison": {
+    "production_random_forest": {
+      "pr_auc": 0.3005,
+      "roc_auc": 0.6003,
+      "f1": 0.3077,
+      "brier_score": 0.2196
+    }
+  },
+  "anti_leakage_checks": {
+    "device_disjoint": true,
+    "temporal_ordering": true
+  }
+}
