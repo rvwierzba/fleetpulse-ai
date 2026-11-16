@@ -92,6 +92,10 @@ class AlertDetailResponse(BaseModel):
     sla_breach_risk: float | None = None
     predicted_subsystem: Subsystem | None = None
     shap_factors: list[dict[str, Any]] | None = None
+    rag_context: dict[str, Any] | None = None
+    matched_runbook_id: str | None = None
+    matched_bulletin_id: str | None = None
+    semantic_cache_hit: bool | None = None
     created_at: datetime
     updated_at: datetime
     events: list[AlertStreamEvent]

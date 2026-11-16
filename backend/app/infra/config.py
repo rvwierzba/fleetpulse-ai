@@ -39,6 +39,17 @@ class Settings(BaseSettings):
     worker_poll_timeout_seconds: float = 2.0
     sse_keepalive_seconds: float = 15.0
 
+    # Sprint 3: Hybrid RAG, Neo4j, Embeddings & Semantic Cache
+    neo4j_uri: str = "bolt://localhost:7687"
+    neo4j_user: str = "neo4j"
+    neo4j_password: str = "fleetpulse_dev_neo4j"
+    neo4j_timeout_seconds: float = 5.0
+    ollama_base_url: str = "http://localhost:11434"
+    embedding_model: str = "nomic-embed-text:latest"
+    embedding_dim: int = 768
+    semantic_cache_threshold: float = 0.90
+    semantic_cache_ttl_seconds: int = 3600
+
 
 @lru_cache
 def get_settings() -> Settings:

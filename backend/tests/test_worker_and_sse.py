@@ -35,6 +35,11 @@ def _make_session_factory(alert: AlertRecord) -> MagicMock:
     session = AsyncMock()
     session.add = MagicMock()
     session.get.return_value = alert
+    mock_res = MagicMock()
+    mock_res.first.return_value = None
+    mock_res.all.return_value = []
+    session.execute = AsyncMock(return_value=mock_res)
+    session.scalars = AsyncMock(return_value=mock_res)
 
     cm = AsyncMock()
     cm.__aenter__.return_value = session
@@ -86,9 +91,9 @@ async def test_worker_dedup_transitions_unique_alert_and_publishes_sse() -> None
         settings=Settings(worker_max_retries=3),
     )
 
-    assert result == AlertStatus.ML_SCORED
-    assert alert.current_status == AlertStatus.ML_SCORED.value
-    assert redis_client.publish.await_count == 2  # DEDUPED and ML_SCORED events
+    assert result == AlertStatus.CONTEXT_RETRIEVED
+    assert alert.current_status == AlertStatus.CONTEXT_RETRIEVED.value
+    assert redis_client.publish.await_count == 3  # DEDUPED, ML_SCORED, CONTEXT_RETRIEVED events
     redis_client.rpush.assert_not_awaited()
 
 
@@ -115,7 +120,7 @@ async def test_worker_marks_duplicate_within_window_as_ignored_duplicate() -> No
 @pytest.mark.asyncio
 async def test_worker_schedules_exponential_retry_before_max_retries() -> None:
     job = _make_job(attempt=1)
-    alert = _make_alert_record(job, AlertStatus.ML_SCORED)
+    alert = _make_alert_record(job, AlertStatus.CONTEXT_RETRIEVED)
     session_factory = _make_session_factory(alert)
     redis_client = AsyncMock()
 
@@ -141,7 +146,7 @@ async def test_worker_schedules_exponential_retry_before_max_retries() -> None:
 @pytest.mark.asyncio
 async def test_worker_moves_exhausted_job_to_dlq_and_publishes_sse() -> None:
     job = _make_job(attempt=3)
-    alert = _make_alert_record(job, AlertStatus.ML_SCORED)
+    alert = _make_alert_record(job, AlertStatus.CONTEXT_RETRIEVED)
     session_factory = _make_session_factory(alert)
     redis_client = AsyncMock()
 

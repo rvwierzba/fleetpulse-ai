@@ -32,6 +32,7 @@ from app.infra.redis_client import (
     schedule_retry_job,
 )
 from app.ml.service import get_ml_service
+from app.rag.orchestrator import get_hybrid_rag_orchestrator
 
 logger = logging.getLogger("fleetpulse.worker")
 
@@ -152,6 +153,42 @@ async def process_single_job(
                 },
             )
             current_status = AlertStatus.ML_SCORED
+
+        if current_status == AlertStatus.ML_SCORED:
+            async with session_factory() as session:
+                alert = await session.get(AlertRecord, job.alert_id)
+                if alert is None:
+                    raise LookupError(f"Alert {job.alert_id} missing from PostgreSQL")
+
+                rag_orchestrator = get_hybrid_rag_orchestrator()
+                rag_res = await rag_orchestrator.enrich_alert_context(
+                    session=session,
+                    redis_client=redis_client,
+                    device_type=alert.device_type,
+                    model_code=alert.model_code,
+                    batch_id=alert.batch_id,
+                    firmware_version=alert.firmware_version,
+                    error_code=alert.error_code,
+                    subsystem=alert.subsystem,
+                    description=alert.description or "",
+                    telemetry=alert.telemetry or {},
+                )
+
+            await _transition_and_publish(
+                session_factory=session_factory,
+                redis_client=redis_client,
+                job=job,
+                target_status=AlertStatus.CONTEXT_RETRIEVED,
+                reason="Hybrid RAG context retrieved (Neo4j + pgvector + Cache)",
+                metadata={
+                    "rag_context": rag_res.model_dump(),
+                    "matched_runbook_id": rag_res.matched_runbook_id,
+                    "matched_bulletin_id": rag_res.matched_bulletin_id,
+                    "semantic_cache_hit": rag_res.cache_hit,
+                    "cache_type": rag_res.cache_type,
+                },
+            )
+            current_status = AlertStatus.CONTEXT_RETRIEVED
 
         await step(job)
         return current_status

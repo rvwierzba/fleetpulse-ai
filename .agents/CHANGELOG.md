@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Sprint 3 — RAG Híbrido (Neo4j + pgvector + Cache Semântico) (Concluída)
+- Módulo `backend/app/rag/` estruturado com schemas de domínio (`RunbookSummary`, `TechBulletinSummary`, `DocumentChunk`, `GraphContext`, `HybridRAGResult`), cliente Neo4j assíncrono (`graph_service.py`), cliente de embeddings locais (`embeddings.py`), busca vetorial no PostgreSQL (`vector_service.py`), cache semântico de 2 níveis (`semantic_cache.py`), seed de dados (`seed_data.py`) e orquestrador híbrido (`orchestrator.py`).
+- Grafo de Conhecimento no Neo4j com constraints de unicidade, mapeando topologia completa de hardware (`NOTEBOOK`, `SMARTPHONE`), modelos ThinkPad e Motorola, lotes de manufatura, versões de BIOS/firmware, códigos de erro e procedimentos operacionais padronizados (Runbooks).
+- Base vetorial no PostgreSQL com extensão `pgvector`, armazenando manuais e boletins técnicos com embeddings gerados localmente pelo Ollama (`nomic-embed-text:latest`, 768 dimensões) e busca por distância de cosseno.
+- Cache Semântico de dois níveis combinando Redis L1 (chave determinística em memória para acertos instantâneos) e pgvector L2 (similaridade de cosseno com threshold `>= 0.90` e TTL configurável) para blindar a infraestrutura contra rajadas de incidentes repetidos na frota.
+- Validador Text-to-Cypher estritamente Read-Only (Invariante Arquitetural #4), bloqueando comandos de mutação (`CREATE`, `MERGE`, `DELETE`, `SET`, `DROP`) e permitindo apenas leitura segura.
+- Validação determinística de existência de IDs de Runbooks e Boletins contra o Neo4j (Invariante Arquitetural #3).
+- Integração no worker assíncrono avançando o estado do alerta de `ML_SCORED` para `CONTEXT_RETRIEVED`, persistindo `rag_context`, `matched_runbook_id`, `matched_bulletin_id` e `semantic_cache_hit` no PostgreSQL e emitindo eventos via SSE.
+- `24` testes automatizados no `pytest` cobrindo o fluxo completo de ponta a ponta sem falhas.
+
 ### Sprint 2 — Machine Learning na Prática (Risco de RMA & SLA + SHAP) (Concluída)
 - Módulo `backend/app/ml/` estruturado com schemas (`SHAPFactor`, `MLScoreResult`), gerador de telemetria realista (`dataset_generator.py`), pipeline de treino com anti-leakage (`train.py`) e serviço de inferência em tempo real com SHAP (`service.py`).
 - Prevenção estrita de data leakage: divisão temporal (70% inicial para treino, 30% final para teste) combinada com agrupamento estritamente disjunto por `device_id` (337 dispositivos de treino, 92 de teste, zero sobreposição).

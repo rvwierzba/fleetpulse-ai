@@ -43,10 +43,13 @@ Este projeto consolida cinco pilares práticos em um único sistema distribuído
 - Explicabilidade local com **SHAP TreeExplainer** traduzida em justificativas humanas legíveis em português e integrada ao worker assíncrono (`DEDUPED -> ML_SCORED`).
 - Cobertura com `18` testes automatizados (`pytest`) e persistência no PostgreSQL + SSE.
 
-### Sprint 3 — RAG Híbrido (Neo4j + pgvector + Cache Semântico)
-- Modelagem do grafo no **Neo4j** (`DeviceType → Model → Batch → Subsystem → FirmwareVersion → ErrorCode → TechBulletin → Runbook`).
-- Ingestão de boletins técnicos e notas no **`pgvector`** com `nomic-embed-text` (Ollama).
-- **Cache Semântico** (similaridade de cosseno + TTL) com métricas de *hit/miss* e **Text-to-Cypher** somente leitura com validação por whitelist.
+### Sprint 3 — RAG Híbrido (Neo4j + pgvector + Cache Semântico) (Concluída)
+- Modelagem e população do grafo no **Neo4j** (`DeviceType → Model → Batch → Subsystem → FirmwareVersion → ErrorCode → TechBulletin → Runbook`) com constraints, índices e relacionamentos de impacto e resolução.
+- Base de conhecimento vetorial no **PostgreSQL (`pgvector`)** com embeddings locais de 768 dimensões gerados via **Ollama (`nomic-embed-text`)** e busca por distância de cosseno.
+- **Cache Semântico em dois níveis** (Redis L1 com chave determinística de assinatura + pgvector L2 com threshold de cosseno `>= 0.90` e TTL) amortecendo tempestades de alertas idênticos na frota.
+- **Motor Text-to-Cypher estritamente Read-Only (Invariante #4)** com validador sintático bloqueando qualquer instrução de mutação (`CREATE`, `MERGE`, `DELETE`, `SET`, `DROP`).
+- **Validação determinística de existência de IDs (Invariante #3)** garantindo que `runbook_id` e `bulletin_id` existam no grafo antes de enriquecimento.
+- Orquestrador híbrido integrado ao worker assíncrono avançando a máquina de estados para `CONTEXT_RETRIEVED` e transmitindo dados enriquecidos via SSE (`24` testes automatizados passando).
 
 ### Sprint 4 — AI System Design, Agentes, Auto-Correção & Guardrails
 - **Hybrid AI Router** (Ollama local primeiro + Circuit Breaker + fallback configurável para Cloud) medindo latência e custo evitado.

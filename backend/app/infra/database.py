@@ -4,7 +4,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Uuid, select, text
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, Uuid, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -61,6 +62,10 @@ class AlertRecord(Base):
     sla_breach_risk: Mapped[float | None] = mapped_column(Float, nullable=True)
     predicted_subsystem: Mapped[str | None] = mapped_column(String(32), nullable=True)
     shap_factors: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    rag_context: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    matched_runbook_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    matched_bulletin_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    semantic_cache_hit: Mapped[bool | None] = mapped_column(nullable=True, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
@@ -85,6 +90,38 @@ class AlertEventRecord(Base):
     alert: Mapped[AlertRecord] = relationship(back_populates="events")
 
 
+class TechDocumentRecord(Base):
+    """Technical bulletins, service manuals, and post-mortems indexed with pgvector."""
+
+    __tablename__ = "tech_documents"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    doc_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    doc_type: Mapped[str] = mapped_column(String(64), index=True)
+    device_type: Mapped[str] = mapped_column(String(32), index=True)
+    subsystem: Mapped[str] = mapped_column(String(32), index=True)
+    content: Mapped[str] = mapped_column(Text)
+    doc_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    embedding: Mapped[Any] = mapped_column(Vector(768))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class SemanticCacheRecord(Base):
+    """Semantic cache entries storing embeddings and cached diagnostic enrichments."""
+
+    __tablename__ = "semantic_cache_entries"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    cache_key: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    signature: Mapped[str] = mapped_column(String(255), index=True)
+    query_text: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[Any] = mapped_column(Vector(768))
+    response_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    ttl_seconds: Mapped[int] = mapped_column(Integer, default=3600)
+
+
 def create_db_engine(database_url: str, timeout_seconds: float = 5.0) -> AsyncEngine:
     """Create an async SQLAlchemy engine with explicit asyncpg connection timeouts."""
     return create_async_engine(
@@ -103,20 +140,24 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
 
 
 async def init_db(engine: AsyncEngine) -> None:
-    """Create missing relational tables on application startup and ensure ML columns exist."""
+    """Create missing relational tables on application startup and ensure ML and RAG columns exist."""
     async with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         await conn.run_sync(Base.metadata.create_all)
         if engine.dialect.name == "postgresql":
-            await conn.execute(
-                text(
-                    """
-                    ALTER TABLE alerts ADD COLUMN IF NOT EXISTS rma_risk_score DOUBLE PRECISION;
-                    ALTER TABLE alerts ADD COLUMN IF NOT EXISTS sla_breach_risk DOUBLE PRECISION;
-                    ALTER TABLE alerts ADD COLUMN IF NOT EXISTS predicted_subsystem VARCHAR(32);
-                    ALTER TABLE alerts ADD COLUMN IF NOT EXISTS shap_factors JSONB;
-                    """
-                )
-            )
+            alter_statements = [
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS rma_risk_score DOUBLE PRECISION;",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS sla_breach_risk DOUBLE PRECISION;",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS predicted_subsystem VARCHAR(32);",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS shap_factors JSONB;",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS rag_context JSONB;",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS matched_runbook_id VARCHAR(64);",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS matched_bulletin_id VARCHAR(64);",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS semantic_cache_hit BOOLEAN DEFAULT FALSE;",
+            ]
+            for stmt in alter_statements:
+                await conn.execute(text(stmt))
 
 
 async def ping_db(engine: AsyncEngine) -> bool:
@@ -230,6 +271,14 @@ async def transition_alert_state(
             alert.predicted_subsystem = str(metadata["predicted_subsystem"])
         if "shap_factors" in metadata and metadata["shap_factors"] is not None:
             alert.shap_factors = metadata["shap_factors"]
+        if "rag_context" in metadata and metadata["rag_context"] is not None:
+            alert.rag_context = metadata["rag_context"]
+        if "matched_runbook_id" in metadata and metadata["matched_runbook_id"] is not None:
+            alert.matched_runbook_id = str(metadata["matched_runbook_id"])
+        if "matched_bulletin_id" in metadata and metadata["matched_bulletin_id"] is not None:
+            alert.matched_bulletin_id = str(metadata["matched_bulletin_id"])
+        if "semantic_cache_hit" in metadata and metadata["semantic_cache_hit"] is not None:
+            alert.semantic_cache_hit = bool(metadata["semantic_cache_hit"])
 
     event = AlertEventRecord(
         id=uuid4(),

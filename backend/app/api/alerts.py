@@ -162,6 +162,10 @@ async def get_alert_detail(
         if alert.predicted_subsystem
         else None,
         shap_factors=alert.shap_factors,
+        rag_context=alert.rag_context,
+        matched_runbook_id=alert.matched_runbook_id,
+        matched_bulletin_id=alert.matched_bulletin_id,
+        semantic_cache_hit=alert.semantic_cache_hit,
         created_at=alert.created_at,
         updated_at=alert.updated_at,
         events=[to_stream_event(event) for event in events],
