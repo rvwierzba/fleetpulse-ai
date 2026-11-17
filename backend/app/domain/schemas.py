@@ -96,6 +96,10 @@ class AlertDetailResponse(BaseModel):
     matched_runbook_id: str | None = None
     matched_bulletin_id: str | None = None
     semantic_cache_hit: bool | None = None
+    agent_diagnosis: dict[str, Any] | None = None
+    triage_action: str | None = None
+    agent_confidence: float | None = None
+    requires_human_approval: bool | None = None
     created_at: datetime
     updated_at: datetime
     events: list[AlertStreamEvent]

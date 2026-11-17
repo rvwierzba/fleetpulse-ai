@@ -64,8 +64,8 @@ VALID_TRANSITIONS: dict[AlertStatus, frozenset[AlertStatus]] = {
     AlertStatus.SCHEMA_VALIDATED: frozenset(
         {AlertStatus.HUMAN_REVIEW, AlertStatus.AUTO_RECOMMENDED, AlertStatus.FAILED_DLQ}
     ),
-    AlertStatus.HUMAN_REVIEW: frozenset({AlertStatus.RESOLVED}),
-    AlertStatus.AUTO_RECOMMENDED: frozenset({AlertStatus.RESOLVED}),
+    AlertStatus.HUMAN_REVIEW: frozenset({AlertStatus.RESOLVED, AlertStatus.FAILED_DLQ}),
+    AlertStatus.AUTO_RECOMMENDED: frozenset({AlertStatus.RESOLVED, AlertStatus.FAILED_DLQ}),
     AlertStatus.IGNORED_DUPLICATE: frozenset(),
     AlertStatus.RESOLVED: frozenset(),
     AlertStatus.FAILED_DLQ: frozenset({AlertStatus.RECEIVED}),

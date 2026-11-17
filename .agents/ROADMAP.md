@@ -51,7 +51,7 @@ Este projeto consolida cinco pilares práticos em um único sistema distribuído
 - **Validação determinística de existência de IDs (Invariante #3)** garantindo que `runbook_id` e `bulletin_id` existam no grafo antes de enriquecimento.
 - Orquestrador híbrido integrado ao worker assíncrono avançando a máquina de estados para `CONTEXT_RETRIEVED` e transmitindo dados enriquecidos via SSE (`24` testes automatizados passando).
 
-### Sprint 4 — AI System Design, Agentes, Auto-Correção & Guardrails
+### Sprint 4 — AI System Design, Agentes, Auto-Correção & Guardrails (Concluída)
 - **Hybrid AI Router** (Ollama local primeiro + Circuit Breaker + fallback configurável para Cloud) medindo latência e custo evitado.
 - **Agente de Triagem** com *tool calling* controlado, saída JSON estrita (Pydantic) + **loop de auto-correção** (até 2 tentativas se o modelo errar schema ou citar `runbook_id`/`bulletin_id` inexistente no Neo4j).
 - Guardrails contra *prompt injection* + regra obrigatória de `HUMAN_REVIEW` para casos críticos.

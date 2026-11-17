@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.agents.triage_agent import get_triage_agent
 from app.domain.enums import AlertStatus
 from app.domain.schemas import AlertJobMessage
 from app.infra.config import Settings, get_settings
@@ -189,6 +190,85 @@ async def process_single_job(
                 },
             )
             current_status = AlertStatus.CONTEXT_RETRIEVED
+
+        # Sprint 4: AI Triage Agent, Pydantic Schema Validation & Human-in-the-Loop Gating
+        if current_status == AlertStatus.CONTEXT_RETRIEVED:
+            async with session_factory() as session:
+                alert = await session.get(AlertRecord, job.alert_id)
+                if alert is None:
+                    raise LookupError(f"Alert {job.alert_id} missing from PostgreSQL")
+                alert_dict = {
+                    "device_id": alert.device_id,
+                    "device_type": alert.device_type,
+                    "model_code": alert.model_code,
+                    "batch_id": alert.batch_id,
+                    "firmware_version": alert.firmware_version,
+                    "sla_tier": alert.sla_tier,
+                    "age_days": alert.age_days,
+                    "subsystem": alert.subsystem,
+                    "error_code": alert.error_code,
+                    "description": alert.description or "",
+                    "telemetry": alert.telemetry or {},
+                }
+                shap_factors = alert.shap_factors
+                rag_context = alert.rag_context
+                rma_risk_score = alert.rma_risk_score
+                sla_breach_risk = alert.sla_breach_risk
+
+            triage_agent = get_triage_agent()
+            triage_res = await triage_agent.diagnose_alert(
+                alert_data=alert_dict,
+                shap_factors=shap_factors,
+                rag_context=rag_context,
+                rma_risk_score=rma_risk_score,
+                sla_breach_risk=sla_breach_risk,
+            )
+
+            diagnosis_dict = triage_res.diagnosis.model_dump() if triage_res.diagnosis else {}
+            diag_metadata = {
+                "agent_diagnosis": diagnosis_dict,
+                "triage_action": triage_res.diagnosis.action_type.value if triage_res.diagnosis else None,
+                "agent_confidence": triage_res.diagnosis.confidence_score if triage_res.diagnosis else None,
+                "requires_human_approval": triage_res.diagnosis.requires_human_approval if triage_res.diagnosis else True,
+                "router_metrics": triage_res.metrics.model_dump(),
+                "self_correction_retries": len(triage_res.correction_attempts),
+            }
+
+            # State transition 1: AGENT_DIAGNOSED
+            await _transition_and_publish(
+                session_factory=session_factory,
+                redis_client=redis_client,
+                job=job,
+                target_status=AlertStatus.AGENT_DIAGNOSED,
+                reason=f"AI Triage Agent completed diagnosis using {triage_res.metrics.model_used}",
+                metadata=diag_metadata,
+            )
+            current_status = AlertStatus.AGENT_DIAGNOSED
+
+            # State transition 2: SCHEMA_VALIDATED
+            await _transition_and_publish(
+                session_factory=session_factory,
+                redis_client=redis_client,
+                job=job,
+                target_status=AlertStatus.SCHEMA_VALIDATED,
+                reason="Pydantic contract and Neo4j entity constraints verified",
+                metadata={"validation_passed": True, "attempts": len(triage_res.correction_attempts) + 1},
+            )
+            current_status = AlertStatus.SCHEMA_VALIDATED
+
+            # State transition 3: HUMAN_REVIEW or AUTO_RECOMMENDED (Invariant #6 Gatekeeper)
+            await _transition_and_publish(
+                session_factory=session_factory,
+                redis_client=redis_client,
+                job=job,
+                target_status=triage_res.status,
+                reason=triage_res.gatekeeper_reason,
+                metadata={
+                    "gatekeeper_status": triage_res.status.value,
+                    "gatekeeper_reason": triage_res.gatekeeper_reason,
+                },
+            )
+            current_status = triage_res.status
 
         await step(job)
         return current_status

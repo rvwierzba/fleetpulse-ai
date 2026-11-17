@@ -66,6 +66,10 @@ class AlertRecord(Base):
     matched_runbook_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     matched_bulletin_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     semantic_cache_hit: Mapped[bool | None] = mapped_column(nullable=True, default=False)
+    agent_diagnosis: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    triage_action: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    agent_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    requires_human_approval: Mapped[bool | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
@@ -155,6 +159,10 @@ async def init_db(engine: AsyncEngine) -> None:
                 "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS matched_runbook_id VARCHAR(64);",
                 "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS matched_bulletin_id VARCHAR(64);",
                 "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS semantic_cache_hit BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS agent_diagnosis JSONB;",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS triage_action VARCHAR(64);",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS agent_confidence DOUBLE PRECISION;",
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS requires_human_approval BOOLEAN;",
             ]
             for stmt in alter_statements:
                 await conn.execute(text(stmt))
@@ -279,6 +287,14 @@ async def transition_alert_state(
             alert.matched_bulletin_id = str(metadata["matched_bulletin_id"])
         if "semantic_cache_hit" in metadata and metadata["semantic_cache_hit"] is not None:
             alert.semantic_cache_hit = bool(metadata["semantic_cache_hit"])
+        if "agent_diagnosis" in metadata and metadata["agent_diagnosis"] is not None:
+            alert.agent_diagnosis = metadata["agent_diagnosis"]
+        if "triage_action" in metadata and metadata["triage_action"] is not None:
+            alert.triage_action = str(metadata["triage_action"])
+        if "agent_confidence" in metadata and metadata["agent_confidence"] is not None:
+            alert.agent_confidence = float(metadata["agent_confidence"])
+        if "requires_human_approval" in metadata and metadata["requires_human_approval"] is not None:
+            alert.requires_human_approval = bool(metadata["requires_human_approval"])
 
     event = AlertEventRecord(
         id=uuid4(),

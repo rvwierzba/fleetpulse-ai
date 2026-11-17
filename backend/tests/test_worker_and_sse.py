@@ -8,12 +8,20 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from app.agents.schemas import (
+    AgentTriageResult,
+    CircuitBreakerState,
+    RouterMetrics,
+    TriageAction,
+    TriageDiagnosis,
+)
 from app.api.deps import get_db_session, get_redis
 from app.domain.enums import AlertStatus, DeviceType, SLATier, Subsystem
 from app.domain.schemas import AlertJobMessage, AlertStreamEvent
 from app.infra.config import Settings
 from app.infra.database import AlertEventRecord, AlertRecord
 from app.main import app
+from app.rag.schemas import GraphContext, HybridRAGResult
 from app.workers.alert_worker import compute_backoff_seconds, process_single_job
 
 
@@ -84,16 +92,60 @@ async def test_worker_dedup_transitions_unique_alert_and_publishes_sse() -> None
     redis_client = AsyncMock()
     redis_client.set.return_value = True  # Acquired dedup lock
 
-    result = await process_single_job(
-        raw_job=job.model_dump_json(),
-        redis_client=redis_client,
-        session_factory=session_factory,
-        settings=Settings(worker_max_retries=3),
+    mock_rag_result = HybridRAGResult(
+        graph_context=GraphContext(
+            device_type="NOTEBOOK",
+            model_code="LATITUDE-7440",
+            batch_id="BATCH-01",
+            firmware_version="BIOS-1.24",
+            error_code="ERR_THERMAL_RUNAWAY",
+            subsystem="THERMAL_BOARD",
+        ),
+        matched_runbook_id="RB-THERMAL-001",
+        matched_bulletin_id="TB-2026-088",
+        cache_hit=False,
+    )
+    mock_triage_result = AgentTriageResult(
+        diagnosis=TriageDiagnosis(
+            matched_runbook_id="RB-THERMAL-001",
+            action_type=TriageAction.DISPATCH_TECH,
+            confidence_score=0.88,
+            root_cause_analysis="Secondary fan bearing friction causing thermal runaway.",
+            requires_human_approval=True,
+        ),
+        status=AlertStatus.HUMAN_REVIEW,
+        metrics=RouterMetrics(
+            model_used="phi4-mini:latest",
+            latency_ms=85.0,
+            circuit_state=CircuitBreakerState.CLOSED,
+            fallback_triggered=False,
+        ),
+        gatekeeper_reason="Action requires physical intervention",
     )
 
-    assert result == AlertStatus.CONTEXT_RETRIEVED
-    assert alert.current_status == AlertStatus.CONTEXT_RETRIEVED.value
-    assert redis_client.publish.await_count == 3  # DEDUPED, ML_SCORED, CONTEXT_RETRIEVED events
+    with patch(
+        "app.workers.alert_worker.get_hybrid_rag_orchestrator"
+    ) as mock_get_rag, patch(
+        "app.workers.alert_worker.get_triage_agent"
+    ) as mock_get_agent:
+        mock_rag_inst = AsyncMock()
+        mock_rag_inst.enrich_alert_context.return_value = mock_rag_result
+        mock_get_rag.return_value = mock_rag_inst
+
+        mock_agent_inst = AsyncMock()
+        mock_agent_inst.diagnose_alert.return_value = mock_triage_result
+        mock_get_agent.return_value = mock_agent_inst
+
+        result = await process_single_job(
+            raw_job=job.model_dump_json(),
+            redis_client=redis_client,
+            session_factory=session_factory,
+            settings=Settings(worker_max_retries=3),
+        )
+
+    assert result == AlertStatus.HUMAN_REVIEW
+    assert alert.current_status == AlertStatus.HUMAN_REVIEW.value
+    assert redis_client.publish.await_count == 6  # DEDUPED, ML_SCORED, CONTEXT_RETRIEVED, AGENT_DIAGNOSED, SCHEMA_VALIDATED, HUMAN_REVIEW
     redis_client.rpush.assert_not_awaited()
 
 
@@ -163,7 +215,7 @@ async def test_worker_moves_exhausted_job_to_dlq_and_publishes_sse() -> None:
 
     assert result == AlertStatus.FAILED_DLQ
     assert alert.current_status == AlertStatus.FAILED_DLQ.value
-    redis_client.publish.assert_awaited_once()
+    assert redis_client.publish.await_count == 4  # AGENT_DIAGNOSED, SCHEMA_VALIDATED, HUMAN_REVIEW, FAILED_DLQ
     redis_client.rpush.assert_awaited_once()
     dlq_payload = json.loads(redis_client.rpush.call_args.args[1])
     assert dlq_payload["job"]["alert_id"] == str(job.alert_id)
