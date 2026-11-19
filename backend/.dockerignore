@@ -1,0 +1,7 @@
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+fleetpulse_backend.egg-info
+tests
