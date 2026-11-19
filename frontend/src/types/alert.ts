@@ -21,10 +21,13 @@ export type Subsystem =
   | 'DISPLAY_PERIPHERAL'
 
 export interface SHAPFactor {
-  feature_name: string
-  attribution_value: number
-  human_label: string
-  risk_direction: 'increases_risk' | 'decreases_risk'
+  feature_name?: string
+  attribution_value?: number
+  human_label?: string
+  risk_direction?: string
+  feature?: string
+  importance?: number
+  value?: any
 }
 
 export interface AlertStreamEvent {
@@ -38,14 +41,17 @@ export interface AlertStreamEvent {
 }
 
 export interface TriageDiagnosis {
-  matched_runbook_id: string
+  matched_runbook_id?: string
   matched_bulletin_id?: string | null
-  action_type: 'REMOTE_PATCH' | 'DISPATCH_TECH' | 'REPLACE_HARDWARE' | 'UPDATE_FIRMWARE' | 'ESCALATE_TIER2'
-  confidence_score: number
-  root_cause_analysis: string
-  requires_human_approval: boolean
+  action_type?: string
+  confidence_score?: number
+  root_cause_analysis?: string
+  requires_human_approval?: boolean
   suggested_action_plan?: string[]
   preventive_measures?: string[]
+  summary?: string
+  protocol?: string
+  safety_action?: string
 }
 
 export interface AlertDetail {
@@ -56,6 +62,7 @@ export interface AlertDetail {
   error_code: string
   sla_tier: SLATier
   current_status: AlertStatus
+  description?: string | null
   rma_risk_score?: number | null
   sla_breach_risk?: number | null
   predicted_subsystem?: Subsystem | null

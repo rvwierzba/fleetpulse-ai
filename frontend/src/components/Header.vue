@@ -1,75 +1,121 @@
 <script setup lang="ts">
-import { defineProps, defineEmits } from 'vue'
-import { Activity, RefreshCw, ShieldAlert, Cpu } from 'lucide-vue-next'
+import { defineProps, defineEmits, ref, onMounted, onUnmounted } from 'vue'
+import { Activity, RefreshCw, ShieldAlert, Cpu, Zap, Radio, Clock } from 'lucide-vue-next'
 import type { SystemMetrics } from '@/types/alert'
 
 const props = defineProps<{
   metrics: SystemMetrics | null
   loading: boolean
+  simulating: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'refresh'): void
+  (e: 'simulate'): void
 }>()
+
+const currentTime = ref('')
+
+function updateClock() {
+  const now = new Date()
+  currentTime.value = now.toTimeString().split(' ')[0] + ' UTC' + (now.getTimezoneOffset() > 0 ? '-' : '+') + Math.abs(now.getTimezoneOffset() / 60)
+}
+
+let clockTimer: any = null
+onMounted(() => {
+  updateClock()
+  clockTimer = setInterval(updateClock, 1000)
+})
+
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer)
+})
 </script>
 
 <template>
-  <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-30 px-6 py-4">
-    <div class="max-w-7xl mx-auto flex items-center justify-between">
-      <!-- Brand & Identity -->
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-          <Activity class="w-5 h-5 text-white animate-pulse" />
+  <header class="relative border-b border-cyber-800 bg-cyber-900/80 backdrop-blur-xl sticky top-0 z-30">
+    <!-- Top hairline cyan glow -->
+    <div class="h-[1px] w-full bg-gradient-to-r from-transparent via-neon-cyan/60 to-transparent"></div>
+
+    <div class="max-w-7xl mx-auto px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <!-- Left: Brand & Telemetry Mission Control -->
+      <div class="flex items-center gap-3.5">
+        <div class="relative w-10 h-10 rounded-lg bg-cyber-850 border border-cyber-700 flex items-center justify-center shadow-neon-cyan">
+          <Activity class="w-5 h-5 text-neon-cyan animate-pulse" />
+          <span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-neon-emerald animate-ping" />
+          <span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-neon-emerald" />
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="font-bold text-lg text-white tracking-tight">FleetPulse <span class="text-cyan-400">AI</span></h1>
-            <span class="text-[10px] uppercase font-mono tracking-widest bg-cyan-950/80 text-cyan-400 px-2 py-0.5 rounded border border-cyan-800/50">
-              Sprint 5 Live
+            <h1 class="font-bold text-base tracking-wider uppercase text-white font-mono">
+              FleetPulse <span class="text-neon-cyan drop-shadow-[0_0_8px_rgba(0,240,255,0.6)]">AI</span>
+            </h1>
+            <span class="text-[9px] uppercase font-mono tracking-widest bg-cyber-800 text-neon-cyan px-2 py-0.5 rounded border border-cyan-500/30">
+              MISSION CONTROL
             </span>
           </div>
-          <p class="text-xs text-slate-400">Telemetria Proativa, RAG Híbrido & Human-in-the-Loop</p>
+          <p class="text-[11px] text-slate-400 font-mono tracking-tight flex items-center gap-1.5 mt-0.5">
+            <Radio class="w-3 h-3 text-neon-emerald" />
+            <span>Autonomous Triage & Human-in-the-Loop Gateway</span>
+          </p>
         </div>
       </div>
 
-      <!-- Live System & Circuit Health Indicators -->
-      <div class="flex items-center gap-4">
-        <!-- Circuit Breaker Pill -->
-        <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs font-mono">
-          <Cpu class="w-4 h-4 text-slate-400" />
-          <span class="text-slate-400">Circuit Breaker:</span>
+      <!-- Right: Real-Time Telemetry HUD & Controls -->
+      <div class="flex items-center flex-wrap gap-3">
+        <!-- Live Clock -->
+        <div class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-cyber-850 border border-cyber-700 text-[11px] font-mono text-slate-300">
+          <Clock class="w-3.5 h-3.5 text-slate-400" />
+          <span>{{ currentTime }}</span>
+        </div>
+
+        <!-- Circuit Breaker Status Pill -->
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-cyber-850 border border-cyber-700 text-xs font-mono">
+          <Cpu class="w-3.5 h-3.5 text-slate-400" />
+          <span class="text-slate-400 text-[11px] uppercase">Circuit:</span>
           <span
             :class="{
-              'text-emerald-400 font-semibold flex items-center gap-1': props.metrics?.circuit_breaker_state === 'CLOSED',
-              'text-rose-400 font-semibold flex items-center gap-1': props.metrics?.circuit_breaker_state === 'OPEN',
-              'text-amber-400 font-semibold flex items-center gap-1': props.metrics?.circuit_breaker_state === 'HALF_OPEN'
+              'text-neon-emerald font-bold flex items-center gap-1.5': props.metrics?.circuit_breaker_state === 'CLOSED',
+              'text-neon-rose font-bold flex items-center gap-1.5': props.metrics?.circuit_breaker_state === 'OPEN',
+              'text-neon-amber font-bold flex items-center gap-1.5': props.metrics?.circuit_breaker_state === 'HALF_OPEN'
             }"
           >
-            <span class="w-2 h-2 rounded-full inline-block"
+            <span
+              class="w-2 h-2 rounded-full inline-block"
               :class="{
-                'bg-emerald-400 animate-ping': props.metrics?.circuit_breaker_state === 'CLOSED',
-                'bg-rose-400 animate-ping': props.metrics?.circuit_breaker_state === 'OPEN',
-                'bg-amber-400 animate-ping': props.metrics?.circuit_breaker_state === 'HALF_OPEN',
+                'bg-neon-emerald': props.metrics?.circuit_breaker_state === 'CLOSED',
+                'bg-neon-rose animate-pulse': props.metrics?.circuit_breaker_state === 'OPEN',
+                'bg-neon-amber animate-pulse': props.metrics?.circuit_breaker_state === 'HALF_OPEN',
               }"
             />
             {{ props.metrics?.circuit_breaker_state || 'CLOSED' }}
           </span>
         </div>
 
-        <!-- DLQ indicator if items exist -->
-        <div v-if="props.metrics && props.metrics.dlq_count > 0" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950/60 border border-rose-800/60 text-rose-300 text-xs font-mono">
-          <ShieldAlert class="w-4 h-4 text-rose-400 animate-bounce" />
+        <!-- DLQ indicator if active -->
+        <div v-if="props.metrics && props.metrics.dlq_count > 0" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-rose-950/80 border border-rose-700/80 text-rose-300 text-xs font-mono shadow-neon-rose">
+          <ShieldAlert class="w-3.5 h-3.5 text-neon-rose animate-bounce" />
           <span>DLQ: {{ props.metrics.dlq_count }}</span>
         </div>
+
+        <!-- Simulator Injection Button -->
+        <button
+          @click="emit('simulate')"
+          :disabled="props.simulating"
+          class="flex items-center gap-2 px-3.5 py-1.5 rounded-md bg-gradient-to-r from-cyan-600/90 to-blue-600/90 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-mono font-semibold tracking-wide border border-cyan-400/40 shadow-neon-cyan transition disabled:opacity-50"
+        >
+          <Zap class="w-3.5 h-3.5" :class="{ 'animate-spin': props.simulating }" />
+          <span>{{ props.simulating ? 'Injetando...' : 'Injetar Telemetria' }}</span>
+        </button>
 
         <!-- Refresh Button -->
         <button
           @click="emit('refresh')"
           :disabled="props.loading"
-          class="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition disabled:opacity-50"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-cyber-850 hover:bg-cyber-800 text-slate-300 text-xs font-mono border border-cyber-700 transition disabled:opacity-50"
         >
-          <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin text-cyan-400': props.loading }" />
-          <span>Atualizar</span>
+          <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin text-neon-cyan': props.loading }" />
+          <span class="hidden sm:inline">Sincronizar</span>
         </button>
       </div>
     </div>

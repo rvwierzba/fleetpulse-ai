@@ -379,3 +379,315 @@ async def get_system_metrics_summary(session: AsyncSession) -> dict[str, Any]:
         "pending_human_review": human_review,
         "semantic_cache_hit_rate": round(hit_rate, 4),
     }
+
+
+async def seed_simulated_fleet_alerts(
+    session: AsyncSession,
+) -> list[tuple[AlertRecord, list[AlertEventRecord]]]:
+    """Generate realistic industrial fleet alerts for live demonstration and telemetry auditing."""
+    scenarios = [
+        {
+            "device_id": "NOTEBOOK-THINKPAD-T14-7429",
+            "device_type": "NOTEBOOK",
+            "model_code": "LENOVO-21AH001RUS",
+            "batch_id": "BATCH-2024-Q1-T14",
+            "firmware_version": "1.42.0",
+            "sla_tier": "PLATINUM",
+            "age_days": 420,
+            "subsystem": "BATTERY_POWER",
+            "error_code": "BATT_THERMAL_RUNAWAY",
+            "description": "Temperatura da célula térmica atingiu 82.4°C sob carga rápida contínua. Ciclo de degradação acelerado.",
+            "telemetry": {"cycle_count": 924, "operating_temp_c": 82.4, "voltage_mv": 12800, "firmware_age_days": 380},
+            "current_status": AlertStatus.HUMAN_REVIEW.value,
+            "rma_risk_score": 0.88,
+            "sla_breach_risk": 0.72,
+            "predicted_subsystem": "BATTERY_POWER",
+            "shap_factors": [
+                {"feature": "cycle_count", "importance": 0.38, "value": 924},
+                {"feature": "operating_temp_c", "importance": 0.31, "value": 82.4},
+                {"feature": "firmware_age_days", "importance": 0.15, "value": 380},
+                {"feature": "device_age_days", "importance": 0.08, "value": 420},
+            ],
+            "rag_context": {
+                "bulletin_id": "TB-2024-BATT-09",
+                "title": "Degradação crítica em células Li-Ion sob carregamento rápido",
+                "graph_lineage": ["ThinkPad T14", "Firmware 1.42.0", "Battery Subsystem", "Thermal Runaway", "RMA Bulletin #09"],
+            },
+            "matched_runbook_id": "RB-BATT-REPLACE-01",
+            "matched_bulletin_id": "TB-2024-BATT-09",
+            "semantic_cache_hit": True,
+            "agent_confidence": 0.94,
+            "requires_human_approval": True,
+            "triage_action": "OPERATOR_DISPATCH_RMA",
+            "agent_diagnosis": {
+                "summary": "Alto risco de inchaço de célula térmica. Recomendada substituição imediata da bateria via suporte N2.",
+                "protocol": "PROTO_RMA_EXPEDITED",
+                "safety_action": "LIMIT_CHARGING_50PCT",
+            },
+        },
+        {
+            "device_id": "NOTEBOOK-MBP-M2-3108",
+            "device_type": "NOTEBOOK",
+            "model_code": "APPLE-A2779-M2",
+            "batch_id": "BATCH-2023-Q4-M2",
+            "firmware_version": "14.5.1",
+            "sla_tier": "GOLD",
+            "age_days": 210,
+            "subsystem": "STORAGE_NVME",
+            "error_code": "NVME_SECTOR_CORRUPTION",
+            "description": "Múltiplos blocos I/O ilegíveis detectados no barramento PCIe durante paginação de kernel.",
+            "telemetry": {"cycle_count": 180, "operating_temp_c": 54.0, "nvme_errors": 1420, "wear_level_pct": 74},
+            "current_status": AlertStatus.HUMAN_REVIEW.value,
+            "rma_risk_score": 0.76,
+            "sla_breach_risk": 0.45,
+            "predicted_subsystem": "STORAGE_NVME",
+            "shap_factors": [
+                {"feature": "nvme_errors", "importance": 0.42, "value": 1420},
+                {"feature": "wear_level_pct", "importance": 0.26, "value": 74},
+                {"feature": "operating_temp_c", "importance": -0.05, "value": 54.0},
+            ],
+            "rag_context": {
+                "bulletin_id": "TB-NVME-CORRUPT-102",
+                "title": "Corrupção de firmware em controladora PCIe NAND sob I/O concorrente",
+                "graph_lineage": ["MacBook Pro M2", "SSD AP0512Z", "Kernel Panic IOStorageFamily", "KB-7712"],
+            },
+            "matched_runbook_id": "RB-NVME-FLASH-03",
+            "matched_bulletin_id": "TB-NVME-CORRUPT-102",
+            "semantic_cache_hit": False,
+            "agent_confidence": 0.89,
+            "requires_human_approval": True,
+            "triage_action": "REPLACE_LOGIC_BOARD",
+            "agent_diagnosis": {
+                "summary": "Controladora NVMe apresentando setores defeituosos irrecuperáveis. Substituição recomendada.",
+                "protocol": "HARDWARE_RMA_REPAIR",
+            },
+        },
+        {
+            "device_id": "PHONE-PIXEL8-PRO-9182",
+            "device_type": "SMARTPHONE",
+            "model_code": "GOOGLE-GC368",
+            "batch_id": "BATCH-2024-Q2-P8P",
+            "firmware_version": "AP2A.240505",
+            "sla_tier": "STANDARD",
+            "age_days": 95,
+            "subsystem": "FIRMWARE_OS",
+            "error_code": "MODEM_5G_CRASH_LOOP",
+            "description": "Reinicialização contínua do modem baseband após handshake em banda n78 NSA.",
+            "telemetry": {"operating_temp_c": 41.2, "handshake_retries": 18, "packet_loss_pct": 84},
+            "current_status": AlertStatus.AUTO_RECOMMENDED.value,
+            "rma_risk_score": 0.22,
+            "sla_breach_risk": 0.15,
+            "predicted_subsystem": "FIRMWARE_OS",
+            "shap_factors": [
+                {"feature": "packet_loss_pct", "importance": 0.25, "value": 84},
+                {"feature": "operating_temp_c", "importance": -0.18, "value": 41.2},
+                {"feature": "device_age_days", "importance": -0.12, "value": 95},
+            ],
+            "rag_context": {
+                "bulletin_id": "TB-MODEM-N78-PATCH",
+                "title": "Bug transitório no modem Shannon 5300 resolvido via patch de APN",
+                "graph_lineage": ["Pixel 8 Pro", "Modem Shannon 5300", "5G Subsystem", "Carrier Patch #441"],
+            },
+            "matched_runbook_id": "RB-MODEM-PROVISION-02",
+            "matched_bulletin_id": "TB-MODEM-N78-PATCH",
+            "semantic_cache_hit": True,
+            "agent_confidence": 0.96,
+            "requires_human_approval": False,
+            "triage_action": "APPLY_OTA_MODEM_PROFILE",
+            "agent_diagnosis": {
+                "summary": "Falha transitória no firmware do modem. Correção autônoma aplicada com sucesso via OTA.",
+                "protocol": "OTA_AUTONOMOUS_FIX",
+            },
+        },
+        {
+            "device_id": "NOTEBOOK-SURFACE-1044",
+            "device_type": "NOTEBOOK",
+            "model_code": "MS-SURFACE-LAPTOP-5",
+            "batch_id": "BATCH-2023-Q3-SL5",
+            "firmware_version": "17.4.1",
+            "sla_tier": "STANDARD",
+            "age_days": 310,
+            "subsystem": "THERMAL_BOARD",
+            "error_code": "CPU_THROTTLE_LOCK",
+            "description": "Frequência dos núcleos de performance travada em 800MHz após pico térmico em renderização.",
+            "telemetry": {"operating_temp_c": 68.0, "clock_freq_mhz": 800, "ambient_temp_c": 26.5},
+            "current_status": AlertStatus.AUTO_RECOMMENDED.value,
+            "rma_risk_score": 0.35,
+            "sla_breach_risk": 0.28,
+            "predicted_subsystem": "THERMAL_BOARD",
+            "shap_factors": [
+                {"feature": "operating_temp_c", "importance": 0.24, "value": 68.0},
+                {"feature": "clock_freq_mhz", "importance": 0.19, "value": 800},
+            ],
+            "rag_context": {
+                "bulletin_id": "TB-THERMAL-GOVERNOR-RESET",
+                "title": "Travamento de governor térmico no SoC após suspensão em background",
+                "graph_lineage": ["Surface Laptop", "Thermal Daemon", "ThermalGovernor", "KB-3180"],
+            },
+            "matched_runbook_id": "RB-THERMAL-RECALIBRATE",
+            "matched_bulletin_id": "TB-THERMAL-GOVERNOR-RESET",
+            "semantic_cache_hit": True,
+            "agent_confidence": 0.91,
+            "requires_human_approval": False,
+            "triage_action": "THERMAL_DAEMON_RESTART",
+            "agent_diagnosis": {
+                "summary": "Daemon térmico preso em proteção de emergência. Recalibração de governor concluída.",
+                "protocol": "AUTO_HEALING_AGENT",
+            },
+        },
+        {
+            "device_id": "NOTEBOOK-DELL-XPS-5521",
+            "device_type": "NOTEBOOK",
+            "model_code": "DELL-XPS-9530",
+            "batch_id": "BATCH-2024-Q1-XPS",
+            "firmware_version": "1.8.0",
+            "sla_tier": "PLATINUM",
+            "age_days": 180,
+            "subsystem": "THERMAL_BOARD",
+            "error_code": "MEM_PARITY_ECC_ERROR",
+            "description": "Erros corrigíveis de ECC na memória LPDDR5 ultrapassaram o limiar aceitável de degradação.",
+            "telemetry": {"ecc_single_bit_errors": 4820, "operating_temp_c": 62.0, "uptime_hours": 720},
+            "current_status": AlertStatus.HUMAN_REVIEW.value,
+            "rma_risk_score": 0.82,
+            "sla_breach_risk": 0.65,
+            "predicted_subsystem": "THERMAL_BOARD",
+            "shap_factors": [
+                {"feature": "ecc_single_bit_errors", "importance": 0.45, "value": 4820},
+                {"feature": "uptime_hours", "importance": 0.18, "value": 720},
+                {"feature": "operating_temp_c", "importance": 0.12, "value": 62.0},
+            ],
+            "rag_context": {
+                "bulletin_id": "TB-LPDDR5-SUBCH-FAIL",
+                "title": "Falha progressiva no subcanal B de memória LPDDR5 soldada",
+                "graph_lineage": ["Dell XPS 9530", "LPDDR5-6000", "Memory Controller", "Hardware Bulletin #12"],
+            },
+            "matched_runbook_id": "RB-MOTHERBOARD-EXCHANGE",
+            "matched_bulletin_id": "TB-LPDDR5-SUBCH-FAIL",
+            "semantic_cache_hit": False,
+            "agent_confidence": 0.95,
+            "requires_human_approval": True,
+            "triage_action": "REPLACE_MOTHERBOARD_ASSEMBLY",
+            "agent_diagnosis": {
+                "summary": "Taxa de erro de paridade ECC indicando falha física irreversível na memória integrada.",
+                "protocol": "EXPEDITED_RMA_HUMAN_APPROVAL",
+            },
+        },
+        {
+            "device_id": "PHONE-SAMSUNG-S24-4410",
+            "device_type": "SMARTPHONE",
+            "model_code": "SAMSUNG-SM-S928B",
+            "batch_id": "BATCH-2024-Q2-S24",
+            "firmware_version": "S928BXXU1AXCA",
+            "sla_tier": "STANDARD",
+            "age_days": 80,
+            "subsystem": "BATTERY_POWER",
+            "error_code": "BATT_CHARGE_PROTECT_TRIP",
+            "description": "Proteção de sobretensão ativada temporariamente por carregador de terceiros não calibrado.",
+            "telemetry": {"operating_temp_c": 36.5, "charger_wattage": 65, "cycle_count": 82},
+            "current_status": AlertStatus.RESOLVED.value,
+            "rma_risk_score": 0.12,
+            "sla_breach_risk": 0.05,
+            "predicted_subsystem": "BATTERY_POWER",
+            "shap_factors": [
+                {"feature": "operating_temp_c", "importance": -0.25, "value": 36.5},
+                {"feature": "cycle_count", "importance": -0.30, "value": 82},
+            ],
+            "rag_context": {
+                "bulletin_id": "TB-USB-PD-HANDSHAKE-RESET",
+                "title": "Desarme preventivo de barramento USB-PD",
+                "graph_lineage": ["Galaxy S24", "PMIC Maxim", "Battery Circuit", "Auto-Cleared"],
+            },
+            "matched_runbook_id": "RB-CHARGER-DIAG-01",
+            "matched_bulletin_id": "TB-USB-PD-HANDSHAKE-RESET",
+            "semantic_cache_hit": True,
+            "agent_confidence": 0.98,
+            "requires_human_approval": False,
+            "triage_action": "OPERATOR_DISPATCH_CONFIRMED",
+            "agent_diagnosis": {
+                "summary": "Evento transitório resolvido. Bateria operando 100% dentro dos parâmetros nominais.",
+                "protocol": "RESOLVED_NOMINAL",
+            },
+        },
+    ]
+
+    results: list[tuple[AlertRecord, list[AlertEventRecord]]] = []
+
+    for sc in scenarios:
+        alert_id = uuid4()
+        idemp = f"sim-{alert_id.hex[:12]}"
+        alert = AlertRecord(
+            id=alert_id,
+            idempotency_key=idemp,
+            source_id="fleetpulse-simulator",
+            device_id=sc["device_id"],
+            device_type=sc["device_type"],
+            model_code=sc["model_code"],
+            batch_id=sc["batch_id"],
+            firmware_version=sc["firmware_version"],
+            sla_tier=sc["sla_tier"],
+            age_days=sc["age_days"],
+            subsystem=sc["subsystem"],
+            error_code=sc["error_code"],
+            description=sc["description"],
+            telemetry=sc["telemetry"],
+            current_status=sc["current_status"],
+            rma_risk_score=sc["rma_risk_score"],
+            sla_breach_risk=sc["sla_breach_risk"],
+            predicted_subsystem=sc["predicted_subsystem"],
+            shap_factors=sc["shap_factors"],
+            rag_context=sc["rag_context"],
+            matched_runbook_id=sc["matched_runbook_id"],
+            matched_bulletin_id=sc["matched_bulletin_id"],
+            semantic_cache_hit=sc["semantic_cache_hit"],
+            agent_diagnosis=sc["agent_diagnosis"],
+            triage_action=sc["triage_action"],
+            agent_confidence=sc["agent_confidence"],
+            requires_human_approval=sc["requires_human_approval"],
+        )
+        session.add(alert)
+        await session.flush()
+
+        # Build chronological audit trail
+        history_steps = [
+            (None, AlertStatus.RECEIVED.value, "Telemetry packet ingested"),
+            (AlertStatus.RECEIVED.value, AlertStatus.DEDUPED.value, "Idempotency hash verified"),
+            (AlertStatus.DEDUPED.value, AlertStatus.ML_SCORED.value, f"Random Forest scored RMA={sc['rma_risk_score']}"),
+            (AlertStatus.ML_SCORED.value, AlertStatus.CONTEXT_RETRIEVED.value, "Hybrid RAG retrieved bulletins and graph lineage"),
+            (AlertStatus.CONTEXT_RETRIEVED.value, AlertStatus.AGENT_DIAGNOSED.value, f"AI Triage Agent evaluated action: {sc['triage_action']}"),
+            (AlertStatus.AGENT_DIAGNOSED.value, AlertStatus.SCHEMA_VALIDATED.value, "Pydantic contract validated"),
+        ]
+
+        if sc["current_status"] == AlertStatus.HUMAN_REVIEW.value:
+            history_steps.append(
+                (AlertStatus.SCHEMA_VALIDATED.value, AlertStatus.HUMAN_REVIEW.value, "High RMA risk requires operator sign-off")
+            )
+        elif sc["current_status"] == AlertStatus.AUTO_RECOMMENDED.value:
+            history_steps.append(
+                (AlertStatus.SCHEMA_VALIDATED.value, AlertStatus.AUTO_RECOMMENDED.value, "Low RMA risk eligible for automated dispatch")
+            )
+        elif sc["current_status"] == AlertStatus.RESOLVED.value:
+            history_steps.append(
+                (AlertStatus.SCHEMA_VALIDATED.value, AlertStatus.AUTO_RECOMMENDED.value, "Low RMA risk eligible for automated dispatch")
+            )
+            history_steps.append(
+                (AlertStatus.AUTO_RECOMMENDED.value, AlertStatus.RESOLVED.value, "Auto-remediation telemetry confirmed healthy state")
+            )
+
+        events: list[AlertEventRecord] = []
+        for from_st, to_st, reason in history_steps:
+            ev = AlertEventRecord(
+                alert_id=alert.id,
+                from_status=from_st,
+                to_status=to_st,
+                reason=reason,
+                event_metadata={"simulated": True},
+            )
+            session.add(ev)
+            events.append(ev)
+
+        await session.flush()
+        results.append((alert, events))
+
+    await session.commit()
+    return results
+

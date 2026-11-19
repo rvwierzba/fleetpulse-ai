@@ -28,6 +28,7 @@ from app.infra.database import (
     get_alert_with_events,
     get_system_metrics_summary,
     list_recent_alerts,
+    seed_simulated_fleet_alerts,
     to_stream_event,
     transition_alert_state,
 )
@@ -219,6 +220,15 @@ async def get_metrics_summary(
         primary_model=router_inst.primary_model,
         fallback_model=router_inst.fallback_model,
     )
+
+
+@router.post("/simulate", response_model=list[AlertDetailResponse])
+async def simulate_fleet_telemetry(
+    db_session: AsyncSession = Depends(get_db_session),  # noqa: B008
+) -> list[AlertDetailResponse]:
+    """Generate realistic fleet telemetry incidents to populate dashboard live view."""
+    created = await seed_simulated_fleet_alerts(db_session)
+    return [_map_alert_detail(a, ev) for a, ev in created]
 
 
 @router.post("/{alert_id}/resolve", response_model=AlertDetailResponse)

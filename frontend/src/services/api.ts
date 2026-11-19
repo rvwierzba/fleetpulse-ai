@@ -46,6 +46,14 @@ export async function resolveAlert(
   return res.json()
 }
 
+export async function simulateAlerts(): Promise<AlertDetail[]> {
+  const res = await fetch(`${API_BASE}/v1/alerts/simulate`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to simulate telemetry`)
+  return res.json()
+}
+
 export function subscribeAlertStream(
   alertId: string,
   onEvent: (event: any) => void,
