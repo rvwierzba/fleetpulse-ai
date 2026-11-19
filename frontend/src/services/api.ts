@@ -1,9 +1,17 @@
 import type { AlertDetail, SystemMetrics } from '@/types/alert'
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+function getBaseUrl(): string {
+  if (import.meta.env.VITE_API_BASE) {
+    return import.meta.env.VITE_API_BASE
+  }
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return 'http://localhost:8000'
+}
 
 export async function fetchAlerts(statusFilter?: string): Promise<AlertDetail[]> {
-  const url = new URL(`${API_BASE}/v1/alerts`)
+  const url = new URL(`${getBaseUrl()}/v1/alerts`)
   if (statusFilter && statusFilter !== 'ALL') {
     url.searchParams.set('status_filter', statusFilter)
   }
@@ -14,13 +22,13 @@ export async function fetchAlerts(statusFilter?: string): Promise<AlertDetail[]>
 }
 
 export async function fetchAlertDetail(alertId: string): Promise<AlertDetail> {
-  const res = await fetch(`${API_BASE}/v1/alerts/${alertId}`)
+  const res = await fetch(`${getBaseUrl()}/v1/alerts/${alertId}`)
   if (!res.ok) throw new Error(`HTTP ${res.status}: Alert not found`)
   return res.json()
 }
 
 export async function fetchSystemMetrics(): Promise<SystemMetrics> {
-  const res = await fetch(`${API_BASE}/v1/alerts/metrics/summary`)
+  const res = await fetch(`${getBaseUrl()}/v1/alerts/metrics/summary`)
   if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch system metrics`)
   return res.json()
 }
@@ -30,7 +38,7 @@ export async function resolveAlert(
   resolutionNote: string,
   actionTaken: string = 'OPERATOR_APPROVED_REMEDIATION'
 ): Promise<AlertDetail> {
-  const res = await fetch(`${API_BASE}/v1/alerts/${alertId}/resolve`, {
+  const res = await fetch(`${getBaseUrl()}/v1/alerts/${alertId}/resolve`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -47,7 +55,7 @@ export async function resolveAlert(
 }
 
 export async function simulateAlerts(): Promise<AlertDetail[]> {
-  const res = await fetch(`${API_BASE}/v1/alerts/simulate`, {
+  const res = await fetch(`${getBaseUrl()}/v1/alerts/simulate`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to simulate telemetry`)
@@ -59,20 +67,20 @@ export function subscribeAlertStream(
   onEvent: (event: any) => void,
   onError?: (err: any) => void
 ): () => void {
-  const eventSource = new EventSource(`${API_BASE}/v1/alerts/${alertId}/stream`)
+  const sseUrl = `${getBaseUrl()}/v1/alerts/${alertId}/stream`
+  const eventSource = new EventSource(sseUrl)
 
-  eventSource.onmessage = (e) => {
+  eventSource.addEventListener('alert_status', (e) => {
     try {
       const data = JSON.parse(e.data)
       onEvent(data)
     } catch (err) {
-      console.error('Failed to parse SSE event data', err)
+      console.error('Failed to parse SSE event JSON', err)
     }
-  }
+  })
 
   eventSource.onerror = (err) => {
     if (onError) onError(err)
-    eventSource.close()
   }
 
   return () => {

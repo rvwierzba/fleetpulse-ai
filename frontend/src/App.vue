@@ -77,11 +77,9 @@ function handleFilterChange(status: string) {
 
 onMounted(async () => {
   await loadData()
-  // Auto-seed on first boot if database is completely empty so dashboard never looks barren
   if (alerts.value.length === 0) {
     await handleSimulate()
   }
-  // Auto-refresh every 5s for live dashboard experience
   pollTimer = setInterval(loadData, 5000)
 })
 
@@ -91,8 +89,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-cyber-950 text-slate-100 flex flex-col font-sans selection:bg-neon-cyan/30 selection:text-neon-cyan">
-    <!-- Header -->
+  <div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
     <Header
       :metrics="metrics"
       :loading="loading"
@@ -101,12 +98,9 @@ onUnmounted(() => {
       @simulate="handleSimulate"
     />
 
-    <!-- Main Content -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
-      <!-- 4 High-Tech KPI Cards -->
       <MetricsOverview :metrics="metrics" />
 
-      <!-- Live Incident Feed Table -->
       <AlertTable
         :alerts="alerts"
         :selected-alert-id="selectedAlert?.alert_id || null"
@@ -116,7 +110,6 @@ onUnmounted(() => {
       />
     </main>
 
-    <!-- Side Inspection & Action Drawer -->
     <AlertDetailDrawer
       :alert="selectedAlert"
       @close="handleCloseDrawer"

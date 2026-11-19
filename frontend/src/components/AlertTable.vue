@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { defineProps, defineEmits, ref, computed } from 'vue'
-import { Laptop, Smartphone, ArrowRight, Search, Zap, AlertCircle } from 'lucide-vue-next'
+import { Laptop, Smartphone, ArrowRight, Search, Play, Inbox } from 'lucide-vue-next'
 import type { AlertDetail, AlertStatus } from '@/types/alert'
 
 const props = defineProps<{
@@ -19,7 +19,7 @@ const searchQuery = ref<string>('')
 
 const filters = [
   { label: 'Todos', value: 'ALL' },
-  { label: 'Human-in-the-Loop', value: 'HUMAN_REVIEW' },
+  { label: 'Revisão Humana', value: 'HUMAN_REVIEW' },
   { label: 'Auto-Recomendados', value: 'AUTO_RECOMMENDED' },
   { label: 'Resolvidos', value: 'RESOLVED' },
   { label: 'DLQ / Falhas', value: 'FAILED_DLQ' },
@@ -53,64 +53,44 @@ function getCount(status: string): number {
   return props.alerts.filter((a) => a.current_status === status).length
 }
 
-function getSubsystemBadge(sub: string) {
-  switch (sub.toUpperCase()) {
-    case 'BATTERY':
-      return 'text-amber-400 bg-amber-950/40 border-amber-800/50'
-    case 'STORAGE':
-      return 'text-cyan-400 bg-cyan-950/40 border-cyan-800/50'
-    case 'THERMAL':
-      return 'text-rose-400 bg-rose-950/40 border-rose-800/50'
-    case 'MEMORY':
-      return 'text-purple-400 bg-purple-950/40 border-purple-800/50'
-    case 'CONNECTIVITY':
-      return 'text-blue-400 bg-blue-950/40 border-blue-800/50'
-    default:
-      return 'text-slate-400 bg-slate-900 border-slate-700'
-  }
-}
-
 function getStatusBadge(status: AlertStatus) {
   switch (status) {
     case 'RECEIVED':
-      return { label: 'Recebido', class: 'bg-cyber-850 text-slate-300 border-cyber-700' }
+      return { label: 'Recebido', class: 'bg-slate-800 text-slate-300' }
     case 'DEDUPED':
-      return { label: 'Deduplicado', class: 'bg-blue-950/80 text-blue-300 border-blue-700/60' }
+      return { label: 'Deduplicado', class: 'bg-blue-950/60 text-blue-300 border border-blue-800/40' }
     case 'ML_SCORED':
-      return { label: 'Score ML + SHAP', class: 'bg-indigo-950/80 text-indigo-300 border-indigo-700/60' }
+      return { label: 'Score ML', class: 'bg-indigo-950/60 text-indigo-300 border border-indigo-800/40' }
     case 'CONTEXT_RETRIEVED':
-      return { label: 'RAG Híbrido', class: 'bg-cyan-950/80 text-cyan-300 border-cyan-700/60' }
+      return { label: 'RAG Contexto', class: 'bg-cyan-950/60 text-cyan-300 border border-cyan-800/40' }
     case 'AGENT_DIAGNOSED':
-      return { label: 'Agente IA', class: 'bg-purple-950/80 text-purple-300 border-purple-700/60' }
+      return { label: 'Agente Diagnosticou', class: 'bg-purple-950/60 text-purple-300 border border-purple-800/40' }
     case 'SCHEMA_VALIDATED':
-      return { label: 'Pydantic OK', class: 'bg-teal-950/80 text-teal-300 border-teal-700/60' }
+      return { label: 'Validado', class: 'bg-teal-950/60 text-teal-300 border border-teal-800/40' }
     case 'HUMAN_REVIEW':
-      return { label: 'Revisão Humana (N2)', class: 'bg-amber-950 text-neon-amber border-amber-600 animate-pulse font-bold shadow-neon-amber' }
+      return { label: 'Revisão Humana', class: 'bg-amber-500/10 text-amber-400 border border-amber-500/30 font-medium' }
     case 'AUTO_RECOMMENDED':
-      return { label: 'Auto-Recomendado', class: 'bg-emerald-950/80 text-neon-emerald border-emerald-700/60' }
+      return { label: 'Auto-Recomendado', class: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-medium' }
     case 'RESOLVED':
-      return { label: 'Resolvido', class: 'bg-cyber-800 text-slate-400 border-cyber-700' }
+      return { label: 'Resolvido', class: 'bg-slate-800 text-slate-400' }
     case 'FAILED_DLQ':
-      return { label: 'Dead Letter Queue', class: 'bg-rose-950 text-neon-rose border-rose-600 font-bold shadow-neon-rose' }
+      return { label: 'Falha / DLQ', class: 'bg-red-500/10 text-red-400 border border-red-500/30 font-medium' }
     default:
-      return { label: status, class: 'bg-cyber-850 text-slate-300 border-cyber-700' }
+      return { label: status, class: 'bg-slate-800 text-slate-300' }
   }
 }
 </script>
 
 <template>
-  <div class="hud-corner-card rounded-lg bg-cyber-900/90 border border-cyber-800 backdrop-blur-xl overflow-hidden shadow-cyber-card">
-    <!-- Filter Tabs & Real-Time Search Header -->
-    <div class="px-6 py-4 border-b border-cyber-800 flex flex-wrap items-center justify-between gap-4">
+  <div class="rounded-lg bg-slate-900 border border-slate-800 overflow-hidden">
+    <!-- Filter Tabs & Search Header -->
+    <div class="px-6 py-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
       <div>
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-neon-cyan animate-ping"></span>
-          <h2 class="text-sm font-bold text-white tracking-wider uppercase font-mono">
-            Feed de Telemetria de Frota
-          </h2>
-        </div>
-        <p class="text-xs text-slate-400 font-mono mt-0.5">
-          Auditoria de esteira assíncrona, predições SHAP e intervenções de engenharia
+        <h2 class="text-sm font-semibold text-slate-100">
+          Incidentes de Frota
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5">
+          Lista de telemetrias processadas pelo pipeline de triagem
         </p>
       </div>
 
@@ -121,27 +101,27 @@ function getStatusBadge(status: AlertStatus) {
           v-model="searchQuery"
           type="text"
           placeholder="Buscar dispositivo ou erro..."
-          class="w-full pl-9 pr-3 py-1.5 rounded-md bg-cyber-850 border border-cyber-700 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-neon-cyan transition"
+          class="w-full pl-9 pr-3 py-1.5 rounded-md bg-slate-800 border border-slate-700 text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition"
         />
       </div>
 
       <!-- Filter Tabs -->
-      <div class="flex items-center flex-wrap gap-1.5 p-1 rounded-md bg-cyber-950/80 border border-cyber-800">
+      <div class="flex items-center flex-wrap gap-1 p-1 rounded-md bg-slate-950 border border-slate-800">
         <button
           v-for="f in filters"
           :key="f.value"
           @click="selectFilter(f.value)"
           :class="[
-            'px-2.5 py-1 rounded text-xs font-mono transition flex items-center gap-1.5',
+            'px-3 py-1 rounded text-xs transition flex items-center gap-1.5',
             activeFilter === f.value
-              ? 'bg-cyber-800 text-neon-cyan border border-cyan-500/30 font-bold shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-900/60'
+              ? 'bg-slate-800 text-slate-100 font-medium'
+              : 'text-slate-400 hover:text-slate-200'
           ]"
         >
           <span>{{ f.label }}</span>
           <span
-            class="text-[10px] px-1.5 py-0.2 rounded-full font-bold"
-            :class="activeFilter === f.value ? 'bg-cyan-950 text-cyan-300' : 'bg-cyber-850 text-slate-500'"
+            class="text-[10px] px-1.5 py-0.2 rounded-full"
+            :class="activeFilter === f.value ? 'bg-slate-700 text-slate-200' : 'bg-slate-800 text-slate-400'"
           >
             {{ getCount(f.value) }}
           </span>
@@ -149,24 +129,24 @@ function getStatusBadge(status: AlertStatus) {
       </div>
     </div>
 
-    <!-- Empty State Banner (When 0 alerts) -->
+    <!-- Empty State -->
     <div v-if="filteredAlerts.length === 0" class="p-12 text-center">
-      <div class="w-16 h-16 mx-auto rounded-full bg-cyber-850 border border-cyber-700 flex items-center justify-center text-neon-cyan mb-4 shadow-neon-cyan">
-        <AlertCircle class="w-8 h-8 animate-pulse" />
+      <div class="w-12 h-12 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-slate-400 mb-3">
+        <Inbox class="w-6 h-6" />
       </div>
-      <h3 class="text-base font-bold text-white font-mono uppercase tracking-wider">
-        Nenhum Alerta Ativo Encontrado
+      <h3 class="text-sm font-medium text-slate-200">
+        Nenhum alerta registrado
       </h3>
-      <p class="text-xs text-slate-400 max-w-md mx-auto mt-2 font-mono leading-relaxed">
-        O pipeline de observabilidade está ativo e aguardando rajadas de telemetria. Injete uma carga de teste para visualizar o fluxo completo da máquina de estados.
+      <p class="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+        Não há incidentes na fila no momento. Clique no botão abaixo para gerar dados simulados de telemetria.
       </p>
-      <div class="mt-6">
+      <div class="mt-4">
         <button
           @click="emit('simulate')"
-          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-mono font-bold tracking-wider uppercase border border-cyan-400/40 shadow-neon-cyan transition"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition shadow-sm"
         >
-          <Zap class="w-4 h-4" />
-          <span>Disparar Injeção de Telemetria (Simulação)</span>
+          <Play class="w-3.5 h-3.5 fill-current" />
+          <span>Gerar Alertas de Teste</span>
         </button>
       </div>
     </div>
@@ -175,81 +155,75 @@ function getStatusBadge(status: AlertStatus) {
     <div v-else class="overflow-x-auto">
       <table class="w-full text-left border-collapse text-xs">
         <thead>
-          <tr class="border-b border-cyber-800 bg-cyber-950/60 text-slate-400 font-mono uppercase tracking-wider text-[11px]">
+          <tr class="border-b border-slate-800 bg-slate-950/40 text-slate-400 font-medium text-[11px]">
             <th class="py-3 px-5">Dispositivo</th>
-            <th class="py-3 px-4">Subsistema / Erro</th>
+            <th class="py-3 px-4">Subsistema</th>
+            <th class="py-3 px-4">Código de Erro</th>
             <th class="py-3 px-4">SLA</th>
-            <th class="py-3 px-4">Risco RMA (ML)</th>
-            <th class="py-3 px-4">Status da Máquina</th>
+            <th class="py-3 px-4">Risco de RMA</th>
+            <th class="py-3 px-4">Status</th>
             <th class="py-3 px-4 text-right">Ação</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-cyber-800/60 font-mono">
+        <tbody class="divide-y divide-slate-800/60">
           <tr
             v-for="alert in filteredAlerts"
             :key="alert.alert_id"
             @click="emit('select', alert)"
             :class="[
-              'cursor-pointer transition group hover:bg-cyber-850/60',
-              selectedAlertId === alert.alert_id ? 'bg-cyan-950/30 border-l-2 border-l-neon-cyan' : ''
+              'cursor-pointer transition hover:bg-slate-800/40',
+              selectedAlertId === alert.alert_id ? 'bg-slate-800/60 border-l-2 border-l-blue-500' : ''
             ]"
           >
             <!-- Device -->
-            <td class="py-3.5 px-5">
-              <div class="flex items-center gap-3">
-                <div class="w-7 h-7 rounded bg-cyber-850 border border-cyber-700 flex items-center justify-center text-slate-300">
-                  <Laptop v-if="alert.device_type === 'NOTEBOOK'" class="w-3.5 h-3.5 text-cyan-400" />
-                  <Smartphone v-else class="w-3.5 h-3.5 text-neon-purple" />
+            <td class="py-3 px-5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-6 h-6 rounded bg-slate-800 flex items-center justify-center text-slate-400">
+                  <Laptop v-if="alert.device_type === 'NOTEBOOK'" class="w-3.5 h-3.5" />
+                  <Smartphone v-else class="w-3.5 h-3.5" />
                 </div>
                 <div>
-                  <p class="font-bold text-white group-hover:text-neon-cyan transition">{{ alert.device_id }}</p>
-                  <p class="text-[10px] text-slate-500">{{ alert.device_type }} &bull; {{ alert.sla_tier }}</p>
+                  <p class="font-medium text-slate-100">{{ alert.device_id }}</p>
+                  <p class="text-[11px] text-slate-400">{{ alert.device_type }}</p>
                 </div>
               </div>
             </td>
 
-            <!-- Subsystem & Error Code -->
-            <td class="py-3.5 px-4">
-              <div class="flex items-center gap-2">
-                <span
-                  class="text-[10px] font-bold px-2 py-0.5 rounded border uppercase"
-                  :class="getSubsystemBadge(alert.subsystem)"
-                >
-                  {{ alert.subsystem }}
-                </span>
-                <span class="text-xs text-slate-200 font-bold tracking-tight">
-                  {{ alert.error_code }}
-                </span>
-              </div>
+            <!-- Subsystem -->
+            <td class="py-3 px-4 text-slate-300">
+              {{ alert.subsystem }}
             </td>
 
-            <!-- SLA Tier -->
-            <td class="py-3.5 px-4">
-              <span class="text-[11px] text-slate-300">
-                {{ alert.sla_tier }}
-              </span>
+            <!-- Error Code -->
+            <td class="py-3 px-4 font-mono text-[11px] text-slate-200">
+              {{ alert.error_code }}
             </td>
 
-            <!-- RMA Risk Gauge Bar -->
-            <td class="py-3.5 px-4">
-              <div v-if="alert.rma_risk_score !== null && alert.rma_risk_score !== undefined" class="w-36">
+            <!-- SLA -->
+            <td class="py-3 px-4 text-slate-400">
+              {{ alert.sla_tier }}
+            </td>
+
+            <!-- RMA Risk -->
+            <td class="py-3 px-4">
+              <div v-if="alert.rma_risk_score !== null && alert.rma_risk_score !== undefined" class="w-28">
                 <div class="flex items-center justify-between text-[11px] mb-1">
                   <span
-                    :class="alert.rma_risk_score >= 0.7 ? 'text-neon-rose font-bold' : 'text-slate-300'"
+                    :class="alert.rma_risk_score >= 0.7 ? 'text-red-400 font-semibold' : 'text-slate-300'"
                   >
                     {{ (alert.rma_risk_score * 100).toFixed(0) }}%
                   </span>
-                  <span v-if="alert.rma_risk_score >= 0.7" class="text-[9px] text-neon-rose uppercase font-bold tracking-wider">
-                    CRÍTICO
+                  <span v-if="alert.rma_risk_score >= 0.7" class="text-[10px] text-red-400 font-medium">
+                    Alto
                   </span>
                 </div>
-                <div class="w-full h-1.5 rounded-full bg-cyber-800 overflow-hidden border border-cyber-700">
+                <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
                   <div
-                    class="h-full transition-all"
+                    class="h-full rounded-full"
                     :style="{ width: `${alert.rma_risk_score * 100}%` }"
                     :class="[
                       alert.rma_risk_score >= 0.70
-                        ? 'bg-gradient-to-r from-amber-500 to-rose-500'
+                        ? 'bg-red-500'
                         : alert.rma_risk_score >= 0.40
                         ? 'bg-amber-400'
                         : 'bg-emerald-400'
@@ -257,13 +231,13 @@ function getStatusBadge(status: AlertStatus) {
                   />
                 </div>
               </div>
-              <span v-else class="text-slate-600 text-[11px]">&mdash;</span>
+              <span v-else class="text-slate-500">&mdash;</span>
             </td>
 
-            <!-- Machine Status Badge -->
-            <td class="py-3.5 px-4">
+            <!-- Status Badge -->
+            <td class="py-3 px-4">
               <span
-                class="inline-block text-[10px] font-mono font-semibold px-2.5 py-1 rounded border tracking-wide"
+                class="inline-block text-[11px] px-2 py-0.5 rounded"
                 :class="getStatusBadge(alert.current_status).class"
               >
                 {{ getStatusBadge(alert.current_status).label }}
@@ -271,12 +245,12 @@ function getStatusBadge(status: AlertStatus) {
             </td>
 
             <!-- Action -->
-            <td class="py-3.5 px-4 text-right">
+            <td class="py-3 px-4 text-right">
               <button
-                class="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-400 group-hover:text-neon-cyan transition font-semibold"
+                class="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 font-medium transition"
               >
-                <span>Inspecionar</span>
-                <ArrowRight class="w-3 h-3 group-hover:translate-x-1 transition" />
+                <span>Detalhes</span>
+                <ArrowRight class="w-3 h-3" />
               </button>
             </td>
           </tr>
