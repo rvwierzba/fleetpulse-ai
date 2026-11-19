@@ -204,3 +204,161 @@ async def test_ingest_alert_enforces_rate_limit_429() -> None:
 
     assert response.status_code == 429
     assert response.headers["Retry-After"] == "42"
+
+
+@pytest.mark.asyncio
+async def test_list_alerts_and_metrics_endpoints() -> None:
+    """Sprint 5: Verify dashboard list and metrics summary endpoints."""
+    fake_redis = AsyncMock()
+    fake_redis.llen.return_value = 0
+    fake_session = AsyncMock()
+
+    mock_alert = AlertRecord(
+        id=uuid4(),
+        idempotency_key="key-test-list",
+        source_id="agent-01",
+        device_id="DEV-NB-001",
+        device_type="NOTEBOOK",
+        model_code="LATITUDE-7440",
+        batch_id="BATCH-01",
+        firmware_version="BIOS-1.24",
+        sla_tier="PLATINUM",
+        age_days=150,
+        subsystem="THERMAL_BOARD",
+        error_code="ERR_THERMAL_RUNAWAY",
+        description="Overheating",
+        telemetry={},
+        current_status=AlertStatus.HUMAN_REVIEW.value,
+        rma_risk_score=0.82,
+        sla_breach_risk=0.45,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+    with patch("app.api.alerts.list_recent_alerts") as mock_list, \
+         patch("app.api.alerts.get_system_metrics_summary") as mock_summary:
+        mock_list.return_value = [(mock_alert, [])]
+        mock_summary.return_value = {
+            "total_alerts": 1,
+            "alerts_by_status": {"HUMAN_REVIEW": 1},
+            "high_rma_alerts": 1,
+            "pending_human_review": 1,
+            "semantic_cache_hit_rate": 0.85,
+        }
+
+        app.dependency_overrides[get_redis] = lambda: fake_redis
+        app.dependency_overrides[get_db_session] = lambda: fake_session
+
+        try:
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+                # 1. Test list
+                list_res = await client.get("/v1/alerts")
+                assert list_res.status_code == 200
+                items = list_res.json()
+                assert len(items) == 1
+                assert items[0]["device_id"] == "DEV-NB-001"
+                assert items[0]["current_status"] == "HUMAN_REVIEW"
+
+                # 2. Test metrics
+                metrics_res = await client.get("/v1/alerts/metrics/summary")
+                assert metrics_res.status_code == 200
+                metrics_data = metrics_res.json()
+                assert metrics_data["total_alerts"] == 1
+                assert metrics_data["high_rma_alerts"] == 1
+                assert metrics_data["pending_human_review"] == 1
+                assert metrics_data["circuit_breaker_state"] in ("CLOSED", "OPEN", "HALF_OPEN")
+        finally:
+            app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_resolve_alert_by_operator_transitions_to_resolved() -> None:
+    """Sprint 5: Operator approves human-in-the-loop alert and marks it RESOLVED."""
+    alert_id = uuid4()
+    fake_redis = AsyncMock()
+    fake_session = AsyncMock()
+
+    mock_alert = AlertRecord(
+        id=alert_id,
+        idempotency_key=f"key-{alert_id}",
+        source_id="agent-01",
+        device_id="DEV-NB-001",
+        device_type="NOTEBOOK",
+        model_code="LATITUDE-7440",
+        batch_id="BATCH-01",
+        firmware_version="BIOS-1.24",
+        sla_tier="PLATINUM",
+        age_days=150,
+        subsystem="THERMAL_BOARD",
+        error_code="ERR_THERMAL_RUNAWAY",
+        description="Overheating",
+        telemetry={},
+        current_status=AlertStatus.HUMAN_REVIEW.value,
+        rma_risk_score=0.82,
+        sla_breach_risk=0.45,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+    resolved_event = AlertEventRecord(
+        id=uuid4(),
+        alert_id=alert_id,
+        from_status=AlertStatus.HUMAN_REVIEW.value,
+        to_status=AlertStatus.RESOLVED.value,
+        reason="Operator engineer-n2 resolved",
+        event_metadata={"operator_id": "engineer-n2"},
+        created_at=datetime.now(UTC),
+    )
+
+    mock_alert_resolved = AlertRecord(
+        id=alert_id,
+        idempotency_key=f"key-{alert_id}",
+        source_id="agent-01",
+        device_id="DEV-NB-001",
+        device_type="NOTEBOOK",
+        model_code="LATITUDE-7440",
+        batch_id="BATCH-01",
+        firmware_version="BIOS-1.24",
+        sla_tier="PLATINUM",
+        age_days=150,
+        subsystem="THERMAL_BOARD",
+        error_code="ERR_THERMAL_RUNAWAY",
+        description="Overheating",
+        telemetry={},
+        current_status=AlertStatus.RESOLVED.value,
+        rma_risk_score=0.82,
+        sla_breach_risk=0.45,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+    with patch("app.api.alerts.get_alert_with_events") as mock_get, \
+         patch("app.api.alerts.transition_alert_state") as mock_trans:
+        mock_get.side_effect = [
+            (mock_alert, []),
+            (mock_alert_resolved, [resolved_event]),
+        ]
+        mock_trans.return_value = resolved_event
+
+        app.dependency_overrides[get_redis] = lambda: fake_redis
+        app.dependency_overrides[get_db_session] = lambda: fake_session
+
+        try:
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+                res = await client.post(
+                    f"/v1/alerts/{alert_id}/resolve",
+                    json={
+                        "resolution_note": "Thermal paste reapplied and fan replaced.",
+                        "action_taken": "DISPATCH_CONFIRMED",
+                        "operator_id": "engineer-n2",
+                    },
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+    assert res.status_code == 200
+    resolved_data = res.json()
+    assert resolved_data["current_status"] == "RESOLVED"
+    fake_redis.publish.assert_awaited_once()

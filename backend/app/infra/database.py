@@ -325,3 +325,57 @@ async def get_alert_with_events(
         .order_by(AlertEventRecord.created_at.asc())
     )
     return alert, list(result.all())
+
+
+async def list_recent_alerts(
+    session: AsyncSession,
+    limit: int = 50,
+    offset: int = 0,
+    status_filter: str | None = None,
+) -> list[tuple[AlertRecord, list[AlertEventRecord]]]:
+    """Fetch paginated alerts alongside their chronological events."""
+    stmt = select(AlertRecord).order_by(AlertRecord.created_at.desc())
+    if status_filter:
+        stmt = stmt.where(AlertRecord.current_status == status_filter)
+    stmt = stmt.limit(limit).offset(offset)
+    alerts = list((await session.scalars(stmt)).all())
+
+    results: list[tuple[AlertRecord, list[AlertEventRecord]]] = []
+    for alert in alerts:
+        event_stmt = (
+            select(AlertEventRecord)
+            .where(AlertEventRecord.alert_id == alert.id)
+            .order_by(AlertEventRecord.created_at.asc())
+        )
+        events = list((await session.scalars(event_stmt)).all())
+        results.append((alert, events))
+    return results
+
+
+async def get_system_metrics_summary(session: AsyncSession) -> dict[str, Any]:
+    """Calculate aggregate counts across alerts table."""
+    all_alerts = list((await session.scalars(select(AlertRecord))).all())
+    status_counts: dict[str, int] = {}
+    high_rma = 0
+    human_review = 0
+    cache_hits = 0
+
+    for a in all_alerts:
+        status_counts[a.current_status] = status_counts.get(a.current_status, 0) + 1
+        if a.rma_risk_score and a.rma_risk_score >= 0.70:
+            high_rma += 1
+        if a.current_status == AlertStatus.HUMAN_REVIEW.value:
+            human_review += 1
+        if a.semantic_cache_hit:
+            cache_hits += 1
+
+    total = len(all_alerts)
+    hit_rate = (cache_hits / total) if total > 0 else 0.0
+
+    return {
+        "total_alerts": total,
+        "alerts_by_status": status_counts,
+        "high_rma_alerts": high_rma,
+        "pending_human_review": human_review,
+        "semantic_cache_hit_rate": round(hit_rate, 4),
+    }

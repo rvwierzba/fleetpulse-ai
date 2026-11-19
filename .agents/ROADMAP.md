@@ -56,7 +56,7 @@ Este projeto consolida cinco pilares práticos em um único sistema distribuído
 - **Agente de Triagem** com *tool calling* controlado, saída JSON estrita (Pydantic) + **loop de auto-correção** (até 2 tentativas se o modelo errar schema ou citar `runbook_id`/`bulletin_id` inexistente no Neo4j).
 - Guardrails contra *prompt injection* + regra obrigatória de `HUMAN_REVIEW` para casos críticos.
 
-### Sprint 5 — Dashboard Vue 3, Simulador de Carga & Documentação Final
+### Sprint 5 — Dashboard Vue 3, Simulador de Carga & Documentação Final (Concluída)
 - Interface **Vue 3 + TypeScript + Tailwind** com acompanhamento ao vivo via SSE, painel de explicabilidade (SHAP + trilha do grafo Neo4j) e fluxo de aprovação **Human-in-the-Loop**.
 - **Simulador "Tempestade de Firmware"** (`benchmarks/`) disparando rajadas de alertas para coletar métricas reais (P50/P95, throughput, economia do Cache Semântico, estabilidade da fila/DLQ).
 - Atualização final do `README.md` com prints, métricas medidas e fechamento do `CHANGELOG.md`.

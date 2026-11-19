@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Sprint 5 — Front-end Observável (Vue 3), Simulador de Carga & Fechamento (Concluída)
+- **Front-end Observável (`frontend/`):** Aplicação completa em **Vue 3 + Vite + TypeScript + Tailwind CSS** consumindo a API e transmitindo eventos em tempo real via **Server-Sent Events (SSE)**.
+  - Componente de **Timeline da Máquina de Estados** em tempo real com indicador de progresso etapa por etapa.
+  - Painel de **Explicabilidade Local (SHAP)** com gráfico de impacto de features no risco de RMA traduzidas para português.
+  - Painel de linhagem causal no **Grafo Neo4j** rastreando topologia de hardware até o Runbook validado.
+  - Interface de aprovação **Human-in-the-Loop (Invariante #6)** permitindo ao operador N2/N3 auditar o diagnóstico da IA, inserir nota técnica e aprovar a resolução do incidente com um clique.
+  - Painel de métricas operacionais com KPIs de saúde do sistema, latência, estado do Circuit Breaker e economia pelo Cache Semântico.
+- **Novos Endpoints de Suporte no Backend:**
+  - `GET /v1/alerts`: Listagem paginada e filtrada de incidentes da frota.
+  - `GET /v1/alerts/metrics/summary`: Sumário agregado de métricas de telemetria, DLQ e Circuit Breaker.
+  - `POST /v1/alerts/{alert_id}/resolve`: Ação operacional do operador humano avançando o estado para `RESOLVED` com auditoria e broadcast SSE.
+  - Configuração de `CORSMiddleware` no FastAPI para integração do frontend local.
+- **Simulador de Carga "Tempestade de Firmware" (`benchmarks/`):**
+  - Script assíncrono `load_simulator.py` disparando rajadas de telemetria concorrente para validar resiliência da esteira.
+  - Medição e impressão de estatísticas reais da máquina: P50, P90, P95, P99, throughput (req/s) e taxa de deduplicação via Redis.
+- **Testes e Qualidade:** 7 testes aprovados em `test_alerts_api.py` cobrindo os novos endpoints e build de produção do Vue 3 (`vue-tsc && vite build`) 100% aprovado.
+
 ### Sprint 4 — AI System Design, Agentes, Auto-Correção & Guardrails (Concluída)
 - Módulo `backend/app/agents/` estruturado com contratos Pydantic v2 (`schemas.py`), guardrails contra prompt injection (`prompt_guard.py`), roteador inteligente com Circuit Breaker (`router.py`), motor de decisão Human-in-the-Loop (`decision.py`) e Agente de Triagem com loop de auto-correção (`triage_agent.py`).
 - **Contrato Pydantic Estrito (`TriageDiagnosis`):** Saída estruturada via JSON Mode com `extra="forbid"`, tipos garantidos, pontuação de confiança limitada matematicamente entre 0.0 e 1.0, e ações operacionais tipadas via Enum (`REMOTE_PATCH`, `DISPATCH_TECH`, `REPLACE_HARDWARE`, `UPDATE_FIRMWARE`, `ESCALATE_TIER2`).

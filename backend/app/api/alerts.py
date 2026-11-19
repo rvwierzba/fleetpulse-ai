@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.router import get_hybrid_ai_router
 from app.api.deps import get_db_session, get_redis
 from app.domain.enums import AlertStatus, DeviceType, SLATier, Subsystem, get_sla_targets
 from app.domain.schemas import (
@@ -16,19 +17,26 @@ from app.domain.schemas import (
     AlertDetailResponse,
     AlertJobMessage,
     AlertStreamEvent,
+    ResolveAlertRequest,
+    SystemMetricsResponse,
 )
 from app.infra.config import Settings, get_settings
 from app.infra.database import (
+    AlertEventRecord,
     AlertRecord,
     create_alert_with_received_event,
     get_alert_with_events,
+    get_system_metrics_summary,
+    list_recent_alerts,
     to_stream_event,
+    transition_alert_state,
 )
 from app.infra.redis_client import (
     check_rate_limit,
     enqueue_alert,
     get_idempotent_response,
     publish_alert_event,
+    queue_length,
     store_idempotent_response,
     stream_channel_name,
 )
@@ -137,17 +145,11 @@ async def ingest_alert(
     return response
 
 
-@router.get("/{alert_id}", response_model=AlertDetailResponse)
-async def get_alert_detail(
-    alert_id: UUID,
-    db_session: AsyncSession = Depends(get_db_session),  # noqa: B008
+def _map_alert_detail(
+    alert: AlertRecord,
+    events: list[AlertEventRecord],
 ) -> AlertDetailResponse:
-    """Return current alert status alongside its full audit event history."""
-    found = await get_alert_with_events(db_session, alert_id)
-    if found is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found.")
-
-    alert, events = found
+    """Map an AlertRecord and its event records to AlertDetailResponse."""
     return AlertDetailResponse(
         alert_id=alert.id,
         device_id=alert.device_id,
@@ -158,9 +160,11 @@ async def get_alert_detail(
         current_status=AlertStatus(alert.current_status),
         rma_risk_score=alert.rma_risk_score,
         sla_breach_risk=alert.sla_breach_risk,
-        predicted_subsystem=Subsystem(alert.predicted_subsystem)
-        if alert.predicted_subsystem
-        else None,
+        predicted_subsystem=(
+            Subsystem(alert.predicted_subsystem)
+            if alert.predicted_subsystem
+            else None
+        ),
         shap_factors=alert.shap_factors,
         rag_context=alert.rag_context,
         matched_runbook_id=alert.matched_runbook_id,
@@ -174,6 +178,105 @@ async def get_alert_detail(
         updated_at=alert.updated_at,
         events=[to_stream_event(event) for event in events],
     )
+
+
+@router.get("", response_model=list[AlertDetailResponse])
+async def list_alerts(
+    limit: int = 50,
+    offset: int = 0,
+    status_filter: str | None = None,
+    db_session: AsyncSession = Depends(get_db_session),  # noqa: B008
+) -> list[AlertDetailResponse]:
+    """Return paginated list of fleet alerts for dashboard."""
+    records = await list_recent_alerts(
+        session=db_session,
+        limit=limit,
+        offset=offset,
+        status_filter=status_filter,
+    )
+    return [_map_alert_detail(a, ev) for a, ev in records]
+
+
+@router.get("/metrics/summary", response_model=SystemMetricsResponse)
+async def get_metrics_summary(
+    db_session: AsyncSession = Depends(get_db_session),  # noqa: B008
+    redis_client: Redis = Depends(get_redis),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> SystemMetricsResponse:
+    """Consolidated system observability telemetry for frontend."""
+    summary = await get_system_metrics_summary(db_session)
+    router_inst = get_hybrid_ai_router()
+    dlq_len = await queue_length(redis_client, settings.alert_dlq_name)
+
+    return SystemMetricsResponse(
+        total_alerts=summary["total_alerts"],
+        alerts_by_status=summary["alerts_by_status"],
+        high_rma_alerts=summary["high_rma_alerts"],
+        pending_human_review=summary["pending_human_review"],
+        dlq_count=dlq_len,
+        circuit_breaker_state=router_inst.circuit_state.value,
+        semantic_cache_hit_rate=summary["semantic_cache_hit_rate"],
+        primary_model=router_inst.primary_model,
+        fallback_model=router_inst.fallback_model,
+    )
+
+
+@router.post("/{alert_id}/resolve", response_model=AlertDetailResponse)
+async def resolve_alert_by_operator(
+    alert_id: UUID,
+    payload: ResolveAlertRequest,
+    db_session: AsyncSession = Depends(get_db_session),  # noqa: B008
+    redis_client: Redis = Depends(get_redis),  # noqa: B008
+) -> AlertDetailResponse:
+    """Human-in-the-loop operator action resolving an alert."""
+    found = await get_alert_with_events(db_session, alert_id)
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found.")
+
+    alert, _ = found
+    current_st = AlertStatus(alert.current_status)
+    if current_st not in (
+        AlertStatus.HUMAN_REVIEW,
+        AlertStatus.AUTO_RECOMMENDED,
+        AlertStatus.SCHEMA_VALIDATED,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Alert in status {current_st.value} cannot be resolved directly.",
+        )
+
+    event = await transition_alert_state(
+        session=db_session,
+        alert_id=alert_id,
+        target_status=AlertStatus.RESOLVED,
+        reason=f"Operator {payload.operator_id} resolved: {payload.action_taken}",
+        metadata={
+            "operator_id": payload.operator_id,
+            "action_taken": payload.action_taken,
+            "resolution_note": payload.resolution_note,
+        },
+    )
+    stream_event = to_stream_event(event)
+    await publish_alert_event(redis_client, alert.id, stream_event.model_dump_json())
+
+    updated = await get_alert_with_events(db_session, alert_id)
+    assert updated is not None
+    upd_alert, upd_events = updated
+    return _map_alert_detail(upd_alert, upd_events)
+
+
+@router.get("/{alert_id}", response_model=AlertDetailResponse)
+async def get_alert_detail(
+    alert_id: UUID,
+    db_session: AsyncSession = Depends(get_db_session),  # noqa: B008
+) -> AlertDetailResponse:
+    """Return current alert status alongside its full audit event history."""
+    found = await get_alert_with_events(db_session, alert_id)
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found.")
+
+    alert, events = found
+    return _map_alert_detail(alert, events)
 
 
 @router.get("/{alert_id}/stream")

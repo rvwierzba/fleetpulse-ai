@@ -103,3 +103,27 @@ class AlertDetailResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     events: list[AlertStreamEvent]
+
+
+class ResolveAlertRequest(BaseModel):
+    """Operator approval payload to transition an alert to RESOLVED."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    resolution_note: str = Field(min_length=3, max_length=1000)
+    action_taken: str = Field(default="OPERATOR_APPROVED_REMEDIATION", min_length=2, max_length=100)
+    operator_id: str = Field(default="engineer-n2", min_length=1, max_length=100)
+
+
+class SystemMetricsResponse(BaseModel):
+    """Consolidated system observability, latency, and queue telemetry."""
+
+    total_alerts: int
+    alerts_by_status: dict[str, int]
+    high_rma_alerts: int
+    pending_human_review: int
+    dlq_count: int
+    circuit_breaker_state: str
+    semantic_cache_hit_rate: float
+    primary_model: str
+    fallback_model: str
