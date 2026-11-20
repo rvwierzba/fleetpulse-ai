@@ -109,8 +109,8 @@ Portas padrão expostas localmente:
 - [x] **Sprint 1:** Ingestão FastAPI (`202 Accepted`), Idempotency-Key, Rate Limiter, Redis Queue + DLQ, Máquina de Estados e SSE (`14` testes em `pytest` + fluxo validado contra Docker)
 - [x] **Sprint 2:** Telemetria realista de frotas (notebooks e smartphones), pipeline de ML tabular sem data leakage (split temporal + agrupamento por dispositivo), avaliação rigorosa com PR-AUC e calibração de Brier score, explicabilidade local via SHAP TreeExplainer e integração assíncrona no worker avançando o estado para `ML_SCORED` (`18` testes automatizados passando)
 - [x] **Sprint 3:** RAG Híbrido em 3 camadas: Grafo de Conhecimento e Topologia no Neo4j, Base Vetorial de Manuais e Boletins Técnicos no PostgreSQL com `pgvector` e embeddings locais (`nomic-embed-text`), Cache Semântico em dois níveis (Redis L1 + pgvector L2 com threshold `>= 0.90`), Validador Text-to-Cypher estritamente Read-Only e transição assíncrona do worker para `CONTEXT_RETRIEVED` (`24` testes automatizados passando)
-- [ ] **Sprint 4:** Hybrid AI Router, Auto-correção Pydantic/Neo4j, Guardrails e Human-in-the-Loop
-- [ ] **Sprint 5:** Dashboard Vue 3 + Simulador de carga "Tempestade de Firmware" + Benchmarks
+- [x] **Sprint 4:** Hybrid AI Router, Auto-correção Pydantic/Neo4j, Guardrails e Human-in-the-Loop
+- [x] **Sprint 5:** Dashboard Vue 3 + Simulador de carga "Tempestade de Firmware" + Benchmarks
 
 ---
 
